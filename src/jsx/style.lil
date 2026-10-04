@@ -1,0 +1,106 @@
+// style-to-js 1.1.21 (`reactCompat`) over style-to-object 1.0.14 and inline-style-parser 0.2.7: a `style`
+// attribute to a React style object, as hast-util-to-jsx-runtime makes it. Declarations keep their order; a
+// later one overwrites an earlier one with the same name. A declaration without a colon throws, as upstream's
+// `Cannot parse \`style\` attribute` does.
+
+extern JsValue Object;
+
+Regex commentPattern = new Regex("\\/\\*[^*]*\\*+([^/*][^*]*\\*+)*\\/", "g");
+Regex whitespacePattern = new Regex("^\\s*", "");
+Regex propertyPattern = new Regex("^(\\*?[-#/*\\\\\\w]+(\\[[0-9a-z_-]+\\])?)\\s*", "");
+Regex colonPattern = new Regex("^:\\s*", "");
+Regex valuePattern = new Regex("^((?:'(?:\\\\'|.)*?'|\"(?:\\\\\"|.)*?\"|\\([^)]*?\\)|[^};])+)", "");
+Regex semicolonPattern = new Regex("^[;\\s]*", "");
+Regex trimPattern = new Regex("^\\s+|\\s+$", "g");
+Regex customProperty = new Regex("^--[a-zA-Z0-9_-]+$", "");
+Regex hyphen = new Regex("-([a-z])", "g");
+Regex noHyphen = new Regex("^[^-]+$", "");
+Regex msPrefix = new Regex("^-(ms)-", "");
+
+// The length of `pattern`'s match at the start of `rest` (-1: none).
+int matchLength(Regex pattern, string rest) {
+  JsValue found = pattern.exec(rest);
+  if (JS.isNullish(found)) {
+    return -1;
+  }
+  string whole = JS.assume(found[0]);
+  return whole.length;
+}
+
+// inline-style-parser's comment: `/* … */` at the start of `rest`; its length, or 0.
+int commentLength(string rest) {
+  if (rest.length < 2 || rest.codeUnitAt(0) != 47 || rest.codeUnitAt(1) != 42) {
+    return 0;
+  }
+  int index = 2;
+  while (index < rest.length && (rest.codeUnitAt(index) != 42 || index + 1 >= rest.length || rest.codeUnitAt(index + 1) != 47)) {
+    index++;
+  }
+  index += 2;
+  if (index - 1 >= rest.length) {
+    throw "Cannot parse `style` attribute";
+  }
+  return index;
+}
+
+// style-to-js's `camelCase` with `reactCompat`.
+string camelCase(string property) {
+  if (property == "" || noHyphen.test(property) || customProperty.test(property)) {
+    return property;
+  }
+  string lower = property.toLowerCase();
+  if (msPrefix.test(lower)) {
+    lower = "ms-" + lower.slice(4);
+  }
+  return JS.assume(JS.invoke(lower, "replace", hyphen, (JsValue whole, JsValue character) => JS.invoke(character, "toUpperCase")));
+}
+
+string clean(string value) {
+  return value.replace(commentPattern, "").replace(trimPattern, "");
+}
+
+export JsValue parseStyle(string style) {
+  JsValue output = object {};
+  string rest = style;
+  int skip = matchLength(whitespacePattern, rest);
+  rest = rest.slice(skip);
+  while (true) {
+    // Comments between declarations (each followed by whitespace).
+    int comment = commentLength(rest);
+    while (comment > 0) {
+      rest = rest.slice(comment);
+      rest = rest.slice(matchLength(whitespacePattern, rest));
+      comment = commentLength(rest);
+    }
+    JsValue property = propertyPattern.exec(rest);
+    if (JS.isNullish(property)) {
+      break;
+    }
+    string name = JS.assume(property[0]);
+    rest = rest.slice(name.length);
+    int after = commentLength(rest);
+    if (after > 0) {
+      rest = rest.slice(after);
+      rest = rest.slice(matchLength(whitespacePattern, rest));
+    }
+    int colon = matchLength(colonPattern, rest);
+    if (colon < 0) {
+      throw "Cannot parse `style` attribute";
+    }
+    rest = rest.slice(colon);
+    JsValue value = valuePattern.exec(rest);
+    string text = "";
+    if (!JS.isNullish(value)) {
+      text = JS.assume(value[0]);
+      rest = rest.slice(text.length);
+    }
+    string key = clean(name);
+    string cleaned = clean(text);
+    rest = rest.slice(matchLength(semicolonPattern, rest));
+    rest = rest.slice(matchLength(whitespacePattern, rest));
+    if (key != "" && cleaned != "") {
+      output[camelCase(key)] = cleaned;
+    }
+  }
+  return output;
+}

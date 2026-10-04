@@ -1,0 +1,13 @@
+// lil2-react-markdown/full: the core with remark-gfm, remark-math and rehype-katex compiled in.
+// `<Markdown plugins={[GFM, MATH, KATEX]}>` applies them, as `remarkPlugins={[remarkGfm, remarkMath]}` and
+// `rehypePlugins={[rehypeKatex]}` do upstream. KaTeX is the `katex` package, loaded first.
+import { katex } from "./katex/host.lil";
+import { Markdown, defaultUrlTransform } from "./react-markdown.lil";
+import { PLUGIN_GFM, PLUGIN_KATEX, PLUGIN_MATH } from "./plugins.lil";
+import { gfmRegistered } from "./gfm-plugin.lil";
+import { katexRegistered, mathRegistered } from "./math-plugin.lil";
+
+export const int GFM = PLUGIN_GFM;
+export const int MATH = PLUGIN_MATH;
+export const int KATEX = PLUGIN_KATEX;
+export { Markdown, defaultUrlTransform };

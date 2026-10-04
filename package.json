@@ -33,6 +33,16 @@
       "browser": "./dist/browser/gfm.js",
       "default": "./dist/gfm.js"
     },
+    "./full": {
+      "convex": "./dist/full.js",
+      "deno": "./dist/full.js",
+      "edge-light": "./dist/full.js",
+      "react-native": "./dist/full.js",
+      "worker": "./dist/full.js",
+      "workerd": "./dist/full.js",
+      "browser": "./dist/browser/full.js",
+      "default": "./dist/full.js"
+    },
     "./constants": {
       "convex": "./dist/constants.js",
       "deno": "./dist/constants.js",
@@ -51,7 +61,7 @@
     "check:sources": "node scripts/shared-sources.mjs",
     "build:dev": "node scripts/build.mjs --dev",
     "build": "node scripts/build.mjs",
-    "test": "npm run check:sources && node --test test/differential.test.mjs test/gfm.test.mjs"
+    "test": "npm run check:sources && node --test test/differential.test.mjs test/gfm.test.mjs test/full.test.mjs"
   },
   "devDependencies": {
     "character-entities": "2.0.2",
@@ -59,6 +69,11 @@
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "react-markdown": "10.1.0",
-    "remark-gfm": "^4.0.1"
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0"
+  },
+  "dependencies": {
+    "katex": "^0.16.22"
   }
 }

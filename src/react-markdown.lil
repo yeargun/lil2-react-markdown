@@ -218,6 +218,8 @@ export JsValue Markdown(JsValue options) {
   }
   visitChildren(new Post(state.hast, options), root);
   JsxOptions jsxOptions = new JsxOptions(Fragment, jsx, jsxs, componentTable(options["components"]));
+  jsxOptions.styles = plugins.styles;
+  jsxOptions.parseStyle = plugins.parseStyle;
   jsxOptions.passNode = true;
   return toJsxRuntime(state.hast, root, jsxOptions);
 }

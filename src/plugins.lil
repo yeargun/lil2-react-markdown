@@ -21,6 +21,9 @@ export class Pipeline {
   (func(Tree)->void)[] remark;
   (func(ToHast)->void)[] hast;
   (func(Hast, int)->void)[] rehype;
+  // A plugin that writes `style` properties (rehype-katex) gives the JSX stage its parser.
+  bool styles;
+  func(string)->JsValue parseStyle;
 
   init(JsValue options) {
     this.options = options;
@@ -29,6 +32,8 @@ export class Pipeline {
     this.remark = [];
     this.hast = [];
     this.rehype = [];
+    this.styles = false;
+    this.parseStyle = (string value) => value;
   }
 }
 

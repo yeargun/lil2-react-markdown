@@ -3,6 +3,8 @@
 // Tag names, property names and enumerated values are ints; their names are only read where a name must
 // leave the program (the React element type and prop keys) and by tests.
 
+import { propComma, propCommaSvg, propReact, propReactSvg } from "./properties.lil";
+
 export const int H_ROOT = 0;
 export const int H_ELEMENT = 1;
 export const int H_TEXT = 2;
@@ -88,6 +90,34 @@ export const int PROP_DATA_FOOTNOTE_BACKREF = 16;
 export const int PROP_COUNT = 17;
 
 export string[] propNames = ["", "href", "title", "src", "alt", "id", "className", "start", "type", "checked", "disabled", "align", "ariaDescribedBy", "ariaLabel", "dataFootnotes", "dataFootnoteRef", "dataFootnoteBackref"];
+Map<string, int> propIds = new Map<string, int>();
+
+// The id of a property name, or -1.
+export int propId(string name) {
+  if (propIds.size == 0) {
+    for (int id = 1; id < propNames.length; id++) {
+      propIds.set(propNames[id], id);
+    }
+  }
+  return propIds.get(name) ?? -1;
+}
+
+// Adds a property past the core table (its JSX key and list joining per schema space); an existing name keeps
+// its id. Layers that parse HTML (rehype-katex) define theirs.
+export int defineProp(string name, string reactHtml, string reactSvg, bool commaHtml, bool commaSvg) {
+  int found = propId(name);
+  if (found >= 0) {
+    return found;
+  }
+  int id = propNames.length;
+  propNames.push(name);
+  propIds.set(name, id);
+  propReact.push(reactHtml);
+  propReactSvg.push(reactSvg);
+  propComma.push(commaHtml);
+  propCommaSvg.push(commaSvg);
+  return id;
+}
 
 // Enumerated attribute values. The alignments equal mdast's `ALIGN_*`.
 export const int KW_NONE = 0;
@@ -106,6 +136,8 @@ export const int P_BOOLEAN = 2;
 export const int P_LIST = 3;
 // An enumerated value: `pNum` is a `KW_*` id.
 export const int P_KEYWORD = 4;
+// A number written in parsed HTML (hastscript's `Number(value)` for numeric attributes): `pStr` holds its text.
+export const int P_FLOAT = 5;
 
 export const int HN_HAS_POSITION = 1;
 export const int HN_META = 2;
