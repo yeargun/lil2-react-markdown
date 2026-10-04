@@ -1,0 +1,205 @@
+// hast as an arena: a node is an int; fields live in parallel arrays.
+// Properties are an ordered list per element (insert or overwrite, like `Object.assign`).
+
+export const int H_ROOT = 0;
+export const int H_ELEMENT = 1;
+export const int H_TEXT = 2;
+export const int H_RAW = 3;
+export const int H_COMMENT = 4;
+export const int H_DOCTYPE = 5;
+
+export string[] hastKindNames = ["root", "element", "text", "raw", "comment", "doctype"];
+
+// Property value kinds.
+export const int P_STRING = 0;
+export const int P_NUMBER = 1;
+export const int P_BOOLEAN = 2;
+// A space-separated list (`className`): `pStr` holds the items joined by one space.
+export const int P_LIST = 3;
+
+export const int HN_HAS_POSITION = 1;
+export const int HN_META = 2;
+
+export class Hast {
+  int[] kind;
+  int[] flags;
+  string[] tagName;
+  string[] value;
+  string[] meta;
+  int[] parent;
+  int[] firstChild;
+  int[] lastChild;
+  int[] nextSibling;
+  int[] previousSibling;
+  // Positions are offsets; line and column come from `lineStarts`.
+  int[] sOffset;
+  int[] eOffset;
+  int[] lineStarts;
+  int[] propHead;
+  int[] propTail;
+  string[] pName;
+  int[] pKind;
+  string[] pStr;
+  int[] pNum;
+  int[] pNext;
+
+  init() {
+    this.kind = [];
+    this.flags = [];
+    this.tagName = [];
+    this.value = [];
+    this.meta = [];
+    this.parent = [];
+    this.firstChild = [];
+    this.lastChild = [];
+    this.nextSibling = [];
+    this.previousSibling = [];
+    this.sOffset = [];
+    this.eOffset = [];
+    this.lineStarts = [0];
+    this.propHead = [];
+    this.propTail = [];
+    this.pName = [];
+    this.pKind = [];
+    this.pStr = [];
+    this.pNum = [];
+    this.pNext = [];
+  }
+
+  int create(int kind, string tagName, string value) {
+    int id = this.kind.length;
+    this.kind.push(kind);
+    this.flags.push(0);
+    this.tagName.push(tagName);
+    this.value.push(value);
+    this.meta.push("");
+    this.parent.push(-1);
+    this.firstChild.push(-1);
+    this.lastChild.push(-1);
+    this.nextSibling.push(-1);
+    this.previousSibling.push(-1);
+    this.sOffset.push(0);
+    this.eOffset.push(0);
+    this.propHead.push(-1);
+    this.propTail.push(-1);
+    return id;
+  }
+
+  int element(string tagName) {
+    return this.create(H_ELEMENT, tagName, "");
+  }
+
+  int text(string value) {
+    return this.create(H_TEXT, "", value);
+  }
+
+  bool has(int node, int flag) {
+    return (this.flags[node] & flag) != 0;
+  }
+
+  void append(int parent, int child) {
+    this.parent[child] = parent;
+    int last = this.lastChild[parent];
+    this.previousSibling[child] = last;
+    this.nextSibling[child] = -1;
+    if (last < 0) {
+      this.firstChild[parent] = child;
+    } else {
+      this.nextSibling[last] = child;
+    }
+    this.lastChild[parent] = child;
+  }
+
+  void prepend(int parent, int child) {
+    this.parent[child] = parent;
+    int first = this.firstChild[parent];
+    this.nextSibling[child] = first;
+    this.previousSibling[child] = -1;
+    if (first < 0) {
+      this.lastChild[parent] = child;
+    } else {
+      this.previousSibling[first] = child;
+    }
+    this.firstChild[parent] = child;
+  }
+
+  void appendAll(int parent, int[] children) {
+    for (int child of children) {
+      this.append(parent, child);
+    }
+  }
+
+  // Detaches all children (they keep existing as nodes).
+  void clearChildren(int parent) {
+    this.firstChild[parent] = -1;
+    this.lastChild[parent] = -1;
+  }
+
+  int[] children(int parent) {
+    int[] list = [];
+    int child = this.firstChild[parent];
+    while (child >= 0) {
+      list.push(child);
+      child = this.nextSibling[child];
+    }
+    return list;
+  }
+
+  int findProperty(int node, string name) {
+    int prop = this.propHead[node];
+    while (prop >= 0) {
+      if (this.pName[prop] == name) {
+        return prop;
+      }
+      prop = this.pNext[prop];
+    }
+    return -1;
+  }
+
+  // Sets a property, keeping the position of an existing one (`properties[name] = value`).
+  int setProperty(int node, string name, int kind, string str, int num) {
+    int prop = this.findProperty(node, name);
+    if (prop < 0) {
+      prop = this.pName.length;
+      this.pName.push(name);
+      this.pKind.push(kind);
+      this.pStr.push(str);
+      this.pNum.push(num);
+      this.pNext.push(-1);
+      int tail = this.propTail[node];
+      if (tail < 0) {
+        this.propHead[node] = prop;
+      } else {
+        this.pNext[tail] = prop;
+      }
+      this.propTail[node] = prop;
+      return prop;
+    }
+    this.pKind[prop] = kind;
+    this.pStr[prop] = str;
+    this.pNum[prop] = num;
+    return prop;
+  }
+
+  void setString(int node, string name, string value) {
+    this.setProperty(node, name, P_STRING, value, 0);
+  }
+
+  void setNumber(int node, string name, int value) {
+    this.setProperty(node, name, P_NUMBER, "", value);
+  }
+
+  void setBoolean(int node, string name, bool value) {
+    this.setProperty(node, name, P_BOOLEAN, "", if (value) { 1 } else { 0 });
+  }
+
+  void setList(int node, string name, string joined) {
+    this.setProperty(node, name, P_LIST, joined, 0);
+  }
+
+  void copyPosition(int to, int sOffset, int eOffset) {
+    this.sOffset[to] = sOffset;
+    this.eOffset[to] = eOffset;
+    this.flags[to] = this.flags[to] | HN_HAS_POSITION;
+  }
+}

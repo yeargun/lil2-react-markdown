@@ -1,0 +1,183 @@
+// react-markdown 10.1.0: markdown to React elements. The pipeline (micromark, mdast, hast) is typed and
+// flat; React, the components map and user callbacks are the only host values.
+
+import extern {Fragment, jsx, jsxs} from "react/jsx-runtime";
+extern JsValue Fragment;
+extern JsValue jsx;
+extern JsValue jsxs;
+extern JsValue Object;
+
+import { fromMarkdownTree } from "./jsx/to-hast/mdast/index.lil";
+import { ToHast, installCommonmark, installGfm, toHast } from "./jsx/to-hast/to-hast.lil";
+import { H_ELEMENT, H_RAW, H_TEXT, HN_HAS_POSITION, P_BOOLEAN, P_LIST, P_NUMBER, Hast } from "./jsx/to-hast/hast.lil";
+import { JsxOptions, hastColumns, toJsxRuntime } from "./jsx/to-jsx.lil";
+
+Regex safeProtocol = new Regex("^(https?|ircs?|mailto|xmpp)$", "i");
+
+// Make a URL safe (react-markdown's `defaultUrlTransform`).
+export string defaultUrlTransform(string value) {
+  int colon = value.indexOf(":");
+  int questionMark = value.indexOf("?");
+  int numberSign = value.indexOf("#");
+  int slash = value.indexOf("/");
+  if (colon == -1 || (slash != -1 && colon > slash) || (questionMark != -1 && colon > questionMark) ||
+      (numberSign != -1 && colon > numberSign) || safeProtocol.test(value.slice(0, colon))) {
+    return value;
+  }
+  return "";
+}
+
+// html-url-attributes: property -> the tag names it is a URL on ("*" for every tag).
+string[] urlProperties = ["action", "cite", "data", "formAction", "href", "icon", "itemId", "manifest", "ping", "poster", "src"];
+string[] urlTags = ["form", "blockquote del ins q", "object", "button input", "a area base link", "menuitem", "*", "html", "a area", "video", "audio embed iframe img input script source track video"];
+
+bool urlTagMatches(string tags, string tagName) {
+  return tags == "*" || (" " + tags + " ").includes(" " + tagName + " ");
+}
+
+class Post {
+  Hast h;
+  JsValue options;
+  JsValue allowedElements;
+  JsValue disallowedElements;
+  JsValue allowElement;
+  JsValue urlTransform;
+  bool skipHtml;
+  bool unwrapDisallowed;
+  // The hast columns, made once if a callback needs them (callbacks get node ids into them).
+  JsValue columns;
+
+  init(Hast h, JsValue options) {
+    this.h = h;
+    this.options = options;
+    this.allowedElements = options["allowedElements"];
+    this.disallowedElements = options["disallowedElements"];
+    this.allowElement = options["allowElement"];
+    this.urlTransform = options["urlTransform"];
+    this.skipHtml = bool(options["skipHtml"]);
+    this.unwrapDisallowed = bool(options["unwrapDisallowed"]);
+    this.columns = JS.undefined();
+  }
+
+  JsValue tree() {
+    if (JS.isUndefined(this.columns)) {
+      this.columns = hastColumns(this.h);
+    }
+    return this.columns;
+  }
+}
+
+// Unlinks `node` from its parent; returns its next sibling.
+int unlink(Hast h, int node) {
+  int parent = h.parent[node];
+  int previous = h.previousSibling[node];
+  int next = h.nextSibling[node];
+  if (previous >= 0) {
+    h.nextSibling[previous] = next;
+  } else {
+    h.firstChild[parent] = next;
+  }
+  if (next >= 0) {
+    h.previousSibling[next] = previous;
+  } else {
+    h.lastChild[parent] = previous;
+  }
+  return next;
+}
+
+// Replaces `node` by its children (`parent.children.splice(index, 1, ...node.children)`); returns the
+// node now at its position.
+int unwrap(Hast h, int node) {
+  int parent = h.parent[node];
+  int first = h.firstChild[node];
+  if (first < 0) {
+    return unlink(h, node);
+  }
+  int last = h.lastChild[node];
+  int previous = h.previousSibling[node];
+  int next = h.nextSibling[node];
+  int child = first;
+  while (child >= 0) {
+    h.parent[child] = parent;
+    child = h.nextSibling[child];
+  }
+  h.previousSibling[first] = previous;
+  h.nextSibling[last] = next;
+  if (previous >= 0) {
+    h.nextSibling[previous] = first;
+  } else {
+    h.firstChild[parent] = first;
+  }
+  if (next >= 0) {
+    h.previousSibling[next] = last;
+  } else {
+    h.lastChild[parent] = last;
+  }
+  return first;
+}
+
+// react-markdown's `transform`, applied the way unist-util-visit applies it: preorder, and a visitor
+// that changes the parent's children resumes at the same index.
+void visitChildren(Post post, int parent) {
+  Hast h = post.h;
+  int index = 0;
+  int child = h.firstChild[parent];
+  while (child >= 0) {
+    int kind = h.kind[child];
+    if (kind == H_RAW) {
+      if (post.skipHtml) {
+        child = unlink(h, child);
+      } else {
+        h.kind[child] = H_TEXT;
+        h.flags[child] = h.flags[child] - (h.flags[child] & HN_HAS_POSITION);
+      }
+      continue;
+    }
+    if (kind == H_ELEMENT) {
+      string tagName = h.tagName[child];
+      for (int at = 0; at < urlProperties.length; at++) {
+        int prop = h.findProperty(child, urlProperties[at]);
+        if (prop >= 0 && urlTagMatches(urlTags[at], tagName)) {
+          string value = if (h.pKind[prop] == P_NUMBER) { "" + h.pNum[prop] } else { h.pStr[prop] };
+          string next = if (bool(post.urlTransform)) {
+            JS.assume(JS.call(post.urlTransform, JS.undefined(), value, urlProperties[at], child, post.tree()))
+          } else {
+            defaultUrlTransform(value)
+          };
+          h.setString(child, urlProperties[at], next);
+        }
+      }
+      bool remove = if (bool(post.allowedElements)) {
+        !bool(JS.invoke(post.allowedElements, "includes", tagName))
+      } else {
+        bool(post.disallowedElements) && bool(JS.invoke(post.disallowedElements, "includes", tagName))
+      };
+      if (!remove && bool(post.allowElement)) {
+        remove = !bool(JS.call(post.allowElement, JS.undefined(), child, index, parent, post.tree()));
+      }
+      if (remove) {
+        child = if (post.unwrapDisallowed) { unwrap(h, child) } else { unlink(h, child) };
+        continue;
+      }
+      visitChildren(post, child);
+    }
+    index++;
+    child = h.nextSibling[child];
+  }
+}
+
+// `<Markdown {...options} />`: react-markdown's props. Callbacks and custom components get nodes as ids into
+// `tree`, the hast columns (see `hastColumns`): `urlTransform(url, key, node, tree)`,
+// `allowElement(node, index, parent, tree)`, and `props.node` / `props.tree` for components.
+export JsValue Markdown(JsValue options) {
+  JsValue children = options["children"];
+  string value = if (JS.typeOf(children) == "string") { JS.assume(children) } else { "" };
+  ToHast state = new ToHast(fromMarkdownTree(value), true);
+  installCommonmark(state);
+  installGfm(state);
+  int root = toHast(state);
+  visitChildren(new Post(state.hast, options), root);
+  JsxOptions jsxOptions = new JsxOptions(Fragment, jsx, jsxs, options["components"]);
+  jsxOptions.passNode = true;
+  return toJsxRuntime(state.hast, root, jsxOptions);
+}

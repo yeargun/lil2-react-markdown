@@ -1,0 +1,205 @@
+// hast-util-to-jsx-runtime 2.3.6 (production `jsx`/`jsxs` path): a hast arena to React elements.
+// React's functions and the components map are host values; everything before them is typed.
+
+import { H_ELEMENT, H_ROOT, H_TEXT, P_BOOLEAN, P_LIST, P_NUMBER, P_STRING, Hast, hastKindNames } from "./to-hast/hast.lil";
+import { reactKey } from "./properties.lil";
+
+extern JsValue Object;
+
+export class JsxOptions {
+  JsValue Fragment;
+  JsValue jsx;
+  JsValue jsxs;
+  JsValue components;
+  bool passKeys;
+  bool passNode;
+  bool tableCellAlignToStyle;
+
+  init(JsValue Fragment, JsValue jsx, JsValue jsxs, JsValue components) {
+    this.Fragment = Fragment;
+    this.jsx = jsx;
+    this.jsxs = jsxs;
+    this.components = components;
+    this.passKeys = true;
+    this.passNode = false;
+    this.tableCellAlignToStyle = true;
+  }
+}
+
+class JsxState {
+  Hast h;
+  JsxOptions options;
+  bool svg;
+  JsValue columns;
+
+  init(Hast h, JsxOptions options) {
+    this.h = h;
+    this.options = options;
+    this.svg = false;
+    this.columns = JS.undefined();
+  }
+}
+
+bool isTableElement(string name) {
+  return name == "table" || name == "tbody" || name == "thead" || name == "tfoot" || name == "tr";
+}
+
+// hast-util-whitespace on a string: only [ \t\n\f\r].
+bool whitespace(string value) {
+  for (int index = 0; index < value.length; index++) {
+    int code = value.codeUnitAt(index);
+    if (code != 32 && code != 9 && code != 10 && code != 12 && code != 13) {
+      return false;
+    }
+  }
+  return true;
+}
+
+JsValue create(JsxState state, JsValue type, JsValue props, string key) {
+  bool isStaticChildren = JS.isArray(props["children"]);
+  JsValue fn = if (isStaticChildren) { state.options.jsxs } else { state.options.jsx };
+  if (key != "") {
+    return fn(type, props, key);
+  }
+  return fn(type, props);
+}
+
+// The hast tree as positional columns (the arena's arrays), shared by every element of a render:
+//   [0] kind  [1] parent  [2] firstChild  [3] nextSibling  [4] tagName  [5] value  [6] startOffset
+//   [7] endOffset  [8] flags  [9] meta  [10] propHead  [11] propName  [12] propKind  [13] propString
+//   [14] propNumber  [15] propNext  [16] lineStarts  [17] kindNames
+export JsValue hastColumns(Hast h) {
+  return [h.kind, h.parent, h.firstChild, h.nextSibling, h.tagName, h.value, h.sOffset, h.eOffset, h.flags, h.meta, h.propHead, h.pName, h.pKind, h.pStr, h.pNum, h.pNext, h.lineStarts, hastKindNames];
+}
+
+JsValue createElementProps(JsxState state, int node) {
+  Hast h = state.h;
+  JsValue props = object {};
+  string alignValue = "";
+  bool cell = h.tagName[node] == "td" || h.tagName[node] == "th";
+  int prop = h.propHead[node];
+  while (prop >= 0) {
+    string name = h.pName[prop];
+    if (name != "children") {
+      string info = reactKey(state.svg, name);
+      bool commaSeparated = info.endsWith(",");
+      string key = if (commaSeparated) { info.slice(0, info.length - 1) } else { info };
+      int kind = h.pKind[prop];
+      JsValue value = JS.undefined();
+      if (kind == P_STRING) {
+        value = h.pStr[prop];
+      } else if (kind == P_NUMBER) {
+        value = h.pNum[prop];
+      } else if (kind == P_BOOLEAN) {
+        value = h.pNum[prop] != 0;
+      } else {
+        string joined = h.pStr[prop];
+        value = if (commaSeparated) { joined.split(" ").join(", ").trim() } else { joined.trim() };
+      }
+      if (state.options.tableCellAlignToStyle && key == "align" && kind != P_NUMBER && kind != P_BOOLEAN && cell) {
+        alignValue = JS.assume(value);
+      } else {
+        props[key] = value;
+      }
+    }
+    prop = h.pNext[prop];
+  }
+  if (alignValue != "") {
+    JsValue style = props["style"];
+    if (!bool(style)) {
+      style = object {};
+      props["style"] = style;
+    }
+    style["textAlign"] = alignValue;
+  }
+  return props;
+}
+
+JsValue one(JsxState state, int node, string key) {
+  Hast h = state.h;
+  int kind = h.kind[node];
+  if (kind == H_ELEMENT) {
+    return element(state, node, key);
+  }
+  if (kind == H_ROOT) {
+    JsValue props = object {};
+    addChildren(props, createChildren(state, node));
+    return create(state, state.options.Fragment, props, key);
+  }
+  if (kind == H_TEXT) {
+    return h.value[node];
+  }
+  return JS.undefined();
+}
+
+JsValue element(JsxState state, int node, string key) {
+  Hast h = state.h;
+  bool parentSvg = state.svg;
+  string tagName = h.tagName[node];
+  if (tagName.toLowerCase() == "svg" && !parentSvg) {
+    state.svg = true;
+  }
+  JsValue components = state.options.components;
+  JsValue type = if (bool(components) && bool(Object.hasOwn(components, tagName))) { components[tagName] } else { tagName };
+  JsValue props = createElementProps(state, node);
+  JsValue[] children = createChildren(state, node);
+  if (isTableElement(tagName)) {
+    children = children.filter((JsValue child) => !(JS.typeOf(child) == "string" && whitespace(JS.assume(child))));
+  }
+  // `passNode`: a component gets its node as an id into `tree`, the columns (one array per render).
+  if (JS.typeOf(type) != "string" && state.options.passNode) {
+    if (JS.isUndefined(state.columns)) {
+      state.columns = hastColumns(h);
+    }
+    props["node"] = node;
+    props["tree"] = state.columns;
+  }
+  addChildren(props, children);
+  state.svg = parentSvg;
+  return create(state, type, props, key);
+}
+
+JsValue[] createChildren(JsxState state, int node) {
+  Hast h = state.h;
+  JsValue[] children = [];
+  Map<string, int> countsByName = new Map<string, int>();
+  int child = h.firstChild[node];
+  while (child >= 0) {
+    string key = "";
+    if (state.options.passKeys && h.kind[child] == H_ELEMENT) {
+      string name = h.tagName[child];
+      int count = countsByName.get(name) ?? 0;
+      key = name + "-" + count;
+      countsByName.set(name, count + 1);
+    }
+    JsValue result = one(state, child, key);
+    if (!JS.isUndefined(result)) {
+      children.push(result);
+    }
+    child = h.nextSibling[child];
+  }
+  return children;
+}
+
+void addChildren(JsValue props, JsValue[] children) {
+  if (children.length > 0) {
+    JsValue value = if (children.length > 1) { children } else { children[0] };
+    if (bool(value)) {
+      props["children"] = value;
+    }
+  }
+}
+
+// `toJsxRuntime(tree, options)` for the root `node` of `h`.
+export JsValue toJsxRuntime(Hast h, int node, JsxOptions options) {
+  JsxState state = new JsxState(h, options);
+  JsValue result = one(state, node, "");
+  if (bool(result) && JS.typeOf(result) != "string") {
+    return result;
+  }
+  JsValue props = object {};
+  if (bool(result)) {
+    props["children"] = result;
+  }
+  return create(state, options.Fragment, props, "");
+}

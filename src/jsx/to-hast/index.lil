@@ -1,0 +1,28 @@
+// lil2-mdast-util-to-hast: an mdast arena to a hast arena.
+
+import { fromMarkdownTree } from "./mdast/index.lil";
+import { Tree } from "./mdast/tree.lil";
+import { Hast, hastKindNames } from "./hast.lil";
+import { ToHast, installCommonmark, installGfm, toHast } from "./to-hast.lil";
+
+// Converts `mdast` (root at node 0) with the CommonMark and GFM handlers, as upstream's defaults do.
+// Returns the state; its `hast` holds the tree, whose root is the returned `root`.
+export ToHast toHastTree(Tree mdast, bool allowDangerousHtml) {
+  ToHast state = new ToHast(mdast, allowDangerousHtml);
+  installCommonmark(state);
+  installGfm(state);
+  return state;
+}
+
+// Markdown to hast, as positional columns (the arena's own arrays), indexed by node id:
+//   [0] root (an id)  [1] kind  [2] parent  [3] firstChild  [4] nextSibling  [5] tagName  [6] value
+//   [7] startOffset  [8] endOffset  [9] flags  [10] meta
+//   [11] propHead  [12] propName  [13] propKind  [14] propString  [15] propNumber  [16] propNext
+//   [17] lineStarts  [18] kindNames
+// A node's properties are the list from `propHead[node]` along `propNext` (-1 ends it).
+export JsValue markdownToHast(string value, bool allowDangerousHtml) {
+  ToHast state = toHastTree(fromMarkdownTree(value), allowDangerousHtml);
+  int root = toHast(state);
+  Hast h = state.hast;
+  return [root, h.kind, h.parent, h.firstChild, h.nextSibling, h.tagName, h.value, h.sOffset, h.eOffset, h.flags, h.meta, h.propHead, h.pName, h.pKind, h.pStr, h.pNum, h.pNext, h.lineStarts, hastKindNames];
+}

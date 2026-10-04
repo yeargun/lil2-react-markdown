@@ -1,0 +1,27 @@
+{
+  "name": "@itslil/lil2-react-markdown",
+  "version": "0.0.0",
+  "private": true,
+  "description": "react-markdown on the typed, flat lil2 pipeline: same React output, smaller and faster",
+  "type": "module",
+  "license": "MIT",
+  "author": "yeargun",
+  "repository": {"type": "git", "url": "git+https://github.com/yeargun/lil2-react-markdown.git"},
+  "homepage": "https://yeargun.github.io/lil2-react-markdown/",
+  "main": "./dist/react-markdown.js",
+  "exports": {".": "./dist/react-markdown.js"},
+  "peerDependencies": {"react": ">=18"},
+  "scripts": {
+    "check:sources": "node scripts/shared-sources.mjs",
+    "build:dev": "node scripts/build.mjs --dev",
+    "build": "node scripts/build.mjs",
+    "test": "npm run check:sources && node --test test/differential.test.mjs"
+  },
+  "devDependencies": {
+    "character-entities": "2.0.2",
+    "commonmark.json": "^0.31.0",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "react-markdown": "10.1.0"
+  }
+}
