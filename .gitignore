@@ -1,4 +1,5 @@
-node_modules
 .dev
 _site
+bench/chat/site
+node_modules
 objectives

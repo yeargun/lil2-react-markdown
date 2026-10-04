@@ -84,8 +84,8 @@
     "NOTICE.md"
   ],
   "peerDependencies": {
-    "react": ">=18",
-    "katex": "^0.16.22"
+    "katex": "^0.16.22",
+    "react": ">=18"
   },
   "peerDependenciesMeta": {
     "katex": {
@@ -96,11 +96,14 @@
     "check:sources": "node scripts/shared-sources.mjs",
     "build:dev": "node scripts/build.mjs --dev",
     "build": "node scripts/build.mjs",
-    "test": "npm run check:sources && node --test test/differential.test.mjs test/gfm.test.mjs test/full.test.mjs"
+    "test": "npm run check:sources && node --test test/differential.test.mjs test/gfm.test.mjs test/full.test.mjs test/chat.test.mjs",
+    "bench:chat": "node bench/chat/build.mjs && node bench/chat/mobile.mjs"
   },
   "devDependencies": {
     "character-entities": "2.0.2",
     "commonmark.json": "^0.31.0",
+    "esbuild": "^0.25.10",
+    "playwright-core": "^1.62.0",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "react-markdown": "10.1.0",
