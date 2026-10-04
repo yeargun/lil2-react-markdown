@@ -1,7 +1,6 @@
 {
   "name": "@itslil/lil2-react-markdown",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "react-markdown on the typed, flat lil2 pipeline: same React output, smaller and faster",
   "type": "module",
   "license": "MIT",
@@ -10,10 +9,32 @@
     "type": "git",
     "url": "git+https://github.com/yeargun/lil2-react-markdown.git"
   },
+  "bugs": {
+    "url": "https://github.com/yeargun/lil2-react-markdown/issues"
+  },
   "homepage": "https://yeargun.github.io/lil2-react-markdown/",
+  "keywords": [
+    "react",
+    "react-markdown",
+    "markdown",
+    "commonmark",
+    "gfm",
+    "katex",
+    "component",
+    "lilscript",
+    "lil2",
+    "typed",
+    "fast"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
   "main": "./dist/react-markdown.js",
+  "types": "./types/index.d.ts",
   "exports": {
     ".": {
+      "types": "./types/index.d.ts",
       "convex": "./dist/react-markdown.js",
       "deno": "./dist/react-markdown.js",
       "edge-light": "./dist/react-markdown.js",
@@ -24,6 +45,7 @@
       "default": "./dist/react-markdown.js"
     },
     "./gfm": {
+      "types": "./types/gfm.d.ts",
       "convex": "./dist/gfm.js",
       "deno": "./dist/gfm.js",
       "edge-light": "./dist/gfm.js",
@@ -34,6 +56,7 @@
       "default": "./dist/gfm.js"
     },
     "./full": {
+      "types": "./types/full.d.ts",
       "convex": "./dist/full.js",
       "deno": "./dist/full.js",
       "edge-light": "./dist/full.js",
@@ -44,6 +67,7 @@
       "default": "./dist/full.js"
     },
     "./constants": {
+      "types": "./types/constants.d.ts",
       "convex": "./dist/constants.js",
       "deno": "./dist/constants.js",
       "edge-light": "./dist/constants.js",
@@ -54,8 +78,19 @@
       "default": "./dist/constants.js"
     }
   },
+  "files": [
+    "dist/**/*.js",
+    "types",
+    "NOTICE.md"
+  ],
   "peerDependencies": {
-    "react": ">=18"
+    "react": ">=18",
+    "katex": "^0.16.22"
+  },
+  "peerDependenciesMeta": {
+    "katex": {
+      "optional": true
+    }
   },
   "scripts": {
     "check:sources": "node scripts/shared-sources.mjs",
@@ -73,8 +108,5 @@
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0"
-  },
-  "dependencies": {
-    "katex": "^0.16.22"
   }
 }

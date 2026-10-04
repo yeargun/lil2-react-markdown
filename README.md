@@ -16,41 +16,132 @@ The whole stack is one LilScript program, from characters to React elements:
 parallel arrays, and every id and enum is an int (token types, construct ids, node kinds, tags, properties,
 enumerated values, plugins). React props are the only objects.
 
-## Use
+## Install
 
-```jsx
-import {Markdown} from '@itslil/lil2-react-markdown'                   // CommonMark
-import {Markdown, GFM} from '@itslil/lil2-react-markdown/gfm'          // + remark-gfm
-import {Markdown, GFM, MATH, KATEX, BREAKS} from '@itslil/lil2-react-markdown/full' // + math, KaTeX, breaks
-import {TAG_H1, TAG_A, PROP_HREF} from '@itslil/lil2-react-markdown/constants'
-
-<Markdown plugins={[GFM, MATH, KATEX]} components={[TAG_H1, Title]}>{markdown}</Markdown>
+```bash
+npm install @itslil/lil2-react-markdown react
+npm install katex   # only for the /full flavor's math
 ```
 
-A flavor is a file: the core carries no plugin, `gfm` carries remark-gfm, `full` carries all four. `plugins`
-applies them, in upstream's order (`[GFM, MATH, KATEX]` is `remarkPlugins={[remarkGfm, remarkMath]}` plus
-`rehypePlugins={[rehypeKatex]}`). Plugin options are props: `singleTilde` (remark-gfm), `singleDollarTextMath`
-(remark-math) and `katex` (rehype-katex, KaTeX's options). KaTeX itself is the `katex` package.
+TypeScript types are included. Each flavor is one ES module; Node, Deno, Bun and workers get `dist/`, bundlers
+targeting browsers get `dist/browser/` through the `browser` condition.
 
-The other props are react-markdown's, with ints for names and ids for nodes:
+## Use
+
+```tsx
+import {Markdown} from '@itslil/lil2-react-markdown'
+
+export function Post({source}: {source: string}) {
+  return <Markdown>{source}</Markdown>
+}
+```
+
+A flavor is a file: the core is CommonMark, `/gfm` adds remark-gfm, `/full` adds remark-gfm, remark-math,
+rehype-katex and remark-breaks. `plugins` turns them on, in upstream's order, and their options are props:
+
+```tsx
+import 'katex/dist/katex.min.css'
+import {Markdown, GFM, MATH, KATEX} from '@itslil/lil2-react-markdown/full'
+
+// Hoisted, so every render passes the same plugins.
+const plugins = [GFM, MATH, KATEX]
+
+export function Answer({source}: {source: string}) {
+  return <Markdown plugins={plugins} singleTilde={false} katex={{macros: {'\\R': '\\mathbb{R}'}}}>{source}</Markdown>
+}
+```
+
+`[GFM, MATH, KATEX]` is `remarkPlugins={[remarkGfm, remarkMath]}` plus `rehypePlugins={[rehypeKatex]}`. The options
+are `singleTilde` (remark-gfm), `singleDollarTextMath` (remark-math) and `katex` (rehype-katex: KaTeX's options).
+
+### Components
+
+```tsx
+import type {ReactNode} from 'react'
+import {Markdown, type ExtraProps} from '@itslil/lil2-react-markdown'
+import {TAG_A, TAG_CODE, tagNames} from '@itslil/lil2-react-markdown/constants'
+
+function Link({href, children}: {href?: string, children?: ReactNode}) {
+  return <a href={href} target="_blank" rel="noreferrer">{children}</a>
+}
+
+// `node` is an id into `tree`, the hast columns of this render.
+function Code({node, tree, className, children}: ExtraProps & {className?: string, children?: ReactNode}) {
+  const [, parent, , , tag] = tree
+  const block = tagNames[tag[parent[node]]] === 'pre'
+  return <code className={block ? className : 'inline'}>{children}</code>
+}
+
+export function Doc({source}: {source: string}) {
+  return <Markdown components={[TAG_A, Link, TAG_CODE, Code]}>{source}</Markdown>
+}
+```
+
+`components` is a list of pairs, a `TAG_*` id then the component; the types check the pairing. A component gets the
+element's properties, `children`, `node` and `tree` (`HastTree`: `[kind, parent, firstChild, nextSibling, tag, value,
+startOffset, endOffset, flags, meta, propHead, propName, propKind, propString, propNumber, propNext, lineStarts,
+tagNames]`).
+
+### Chat apps: streaming replies
+
+Re-render the reply as it streams, and keep finished messages memoized so only the growing one renders:
+
+```tsx
+import {memo} from 'react'
+import {Markdown, GFM, MATH, KATEX} from '@itslil/lil2-react-markdown/full'
+
+const plugins = [GFM, MATH, KATEX]
+
+export const Message = memo(function Message({text}: {text: string}) {
+  return <Markdown plugins={plugins}>{text}</Markdown>
+})
+
+export function Chat({messages}: {messages: readonly string[]}) {
+  return <main>{messages.map((text, index) => <Message key={index} text={text} />)}</main>
+}
+```
+
+Every partial reply renders exactly as react-markdown renders it (checked after every streamed update; see
+[In practice](#in-practice)).
+
+### Options, from react-markdown
 
 | react-markdown | lil2-react-markdown |
 |---|---|
+| `remarkPlugins={[remarkGfm, remarkMath]}`, `rehypePlugins={[rehypeKatex]}` | `plugins={[GFM, MATH, KATEX]}` from `/full` |
 | `components={{h1: Title}}` | `components={[TAG_H1, Title]}` (tag, component pairs) |
 | `allowedElements={['p', 'em']}`, `disallowedElements` | `allowedElements={[TAG_P, TAG_EM]}` |
 | `urlTransform(url, 'href', node)` | `urlTransform(url, PROP_HREF, node, tree)` |
 | `allowElement(node, index, parent)` | `allowElement(node, index, parent, tree)` |
-| a component's `props.node` (an object) | `props.node`, an id into `props.tree` (the hast columns) |
+| a component's `props.node` (an object) | `props.node`, an id into `props.tree` |
+| `remarkRehypeOptions` footnote fields | props: `clobberPrefix`, `footnoteLabel`, `footnoteLabelTag` (a tag id), `footnoteBackLabel`, `footnoteBackContent` |
 
-`tree` is one array of columns per render, shared by every element:
-`[kind, parent, firstChild, nextSibling, tag, value, startOffset, endOffset, flags, meta, propHead, propName,
-propKind, propString, propNumber, propNext, lineStarts, tagNames]`.
+`skipHtml`, `unwrapDisallowed` and `children` are unchanged. The constants (`TAG_*`, `PROP_*`, `tagNames`,
+`propNames`) come from `@itslil/lil2-react-markdown/constants`, a separate entry with literal types.
 
-`skipHtml` and `unwrapDisallowed` are unchanged. remark-rehype's footnote options are props too: `clobberPrefix`,
-`footnoteLabel`, `footnoteLabelTag` (a tag id), and `footnoteBackLabel` and `footnoteBackContent` (a string, or a
-function of the reference and rereference index returning one). `constants` (`TAG_*`, `PROP_*`, `tagNames`, `propNames`) is its
-own entry, so importing a flavor costs nothing for them.
+### Without React components: an HTML string
 
+```ts
+import {createElement} from 'react'
+import {renderToStaticMarkup} from 'react-dom/server'
+import {Markdown, GFM, MATH, KATEX} from '@itslil/lil2-react-markdown/full'
+
+const html = renderToStaticMarkup(createElement(Markdown, {plugins: [GFM, MATH, KATEX]}, '| a |\n|---|\n| $x^2$ |'))
+console.log(html) // <table>…<span class="katex">…
+```
+
+### Which package
+
+| you want | package |
+|---|---|
+| React elements | [`@itslil/lil2-react-markdown`](https://github.com/yeargun/lil2-react-markdown) (`/gfm`, `/full` for GFM, math, KaTeX) |
+| an HTML string, CommonMark | [`@itslil/lil2-micromark`](https://github.com/yeargun/lil2-micromark) |
+| an HTML string with GFM, math or KaTeX | `renderToStaticMarkup` of lil2-react-markdown's `/full` flavor (below) |
+| mdast (syntax tree) | [`lil2-mdast-util-from-markdown`](https://github.com/yeargun/lil2-mdast-util-from-markdown); with GFM [`lil2-remark-gfm`](https://github.com/yeargun/lil2-remark-gfm), math [`lil2-remark-math`](https://github.com/yeargun/lil2-remark-math), breaks [`lil2-remark-breaks`](https://github.com/yeargun/lil2-remark-breaks) |
+| hast (HTML tree) | [`lil2-mdast-util-to-hast`](https://github.com/yeargun/lil2-mdast-util-to-hast) and the same three, or [`lil2-rehype-katex`](https://github.com/yeargun/lil2-rehype-katex) with formulas rendered |
+
+Every package is one self-contained ES module with no runtime dependencies (React and KaTeX aside), ships its
+TypeScript types, and resolves to a Node build or a browser build through its `exports` conditions.
 ## Builds
 
 `dist/` serves Node, workers, Deno and the other non-browser conditions; `dist/browser/` is the `browser`
@@ -88,6 +179,67 @@ document uses the full flavor (GFM, math, KaTeX). Cold rows are the first import
 | math | 17.8 / 13.4 / **9.80** ms | 21.0 / 20.5 / **15.0** ms |
 | import, cold | 9.80 / 8.50 / **5.40** ms | 18.0 / 16.0 / **12.0** ms |
 | first render, cold | 19.9 / 20.3 / **15.8** ms | 15.0 / 14.0 / **14.0** ms |
+
+## In practice
+
+Measured 2026-10-04 on one core of an AMD EPYC 7763 (a fast server core: a mid-range phone takes roughly 3 to 5
+times longer), headless Chromium 151 and Firefox 153, React 19.2. Every side renders GFM, math and KaTeX: lil2's
+`/full` flavor against react-markdown 10.1.0 with remark-gfm, remark-math and rehype-katex.
+
+### A streaming chat
+
+A 24-turn conversation of LLM-style replies (paragraphs, lists, code blocks, tables, headings, math in a third of
+them; 60 KB of markdown), each reply streamed about 12 characters per update, 5,368 updates in all. Every update
+renders the growing reply into the DOM with React; finished messages stay mounted and memoized, as in a chat app.
+
+| | react-markdown | react-markdownlil | **lil2** |
+|---|---:|---:|---:|
+| one update, median / p95 / worst, Chromium | 2.0 / 6.1 / 117 ms | 1.5 / 4.9 / 106 ms | **0.6 / 2.1 / 48 ms** |
+| one update, median / p95 / worst, Firefox | 2 / 5 / 10 ms | 2 / 4 / 11 ms | **1 / 2 / 8 ms** |
+| main thread for the whole chat, fresh tab, Chromium | 20.8 s | 17.0 s | **7.1 s** |
+| main thread for the whole chat, warm, Chromium / Firefox | 13.1 / 11.7 s | 10.1 / 10.9 s | **4.4 / 5.3 s** |
+| JavaScript allocated while the chat streams | 4.6 GB (901 KB per update) | 3.9 GB (768 KB) | **2.8 GB (551 KB)** |
+| JavaScript heap high-water mark while streaming | 69 MB | 68 MB | **44 MB** |
+| heap of the loaded library | 2.2 MB | 2.1 MB | **1.8 MB** |
+| heap per message on screen | 122 KB | 119 KB | 121 KB |
+| streamed updates whose DOM equals react-markdown's | | 5,344 of 5,344 | 5,344 of 5,344 |
+
+What it means:
+
+- **Each token is cheaper.** A streamed update takes a third of react-markdown's time. Scaled to a phone, react-markdown's
+  p95 update (6 ms here) lands around 20 to 30 ms, past a 60 Hz frame (16.7 ms), while lil2's (2 ms) stays at 6 to 10 ms.
+- **The whole chat costs a third of the CPU:** 7 s instead of 21 s of main thread in a fresh tab, which is battery on a
+  laptop or phone, and time the page could spend on input and scrolling.
+- **Less garbage, lower peaks.** 39% fewer bytes allocated means less garbage-collection work, and the heap peaks 25 MB
+  lower while a reply streams. 97 to 99% of what any of the three allocates while streaming is the markdown pipeline
+  re-run over the whole reply on every update; React's share is under 1%.
+- **What stays on screen is the same.** A mounted message keeps about 120 KB (React's fibers and the DOM) with every
+  library; lil2 keeps nothing extra.
+- **Behaviour is the same at every step**, including half-written tables, code fences and formulas mid-stream.
+
+Rendering the whole reply on every update is how `<Markdown>{text}</Markdown>` works for every library; updating at
+most once per animation frame (or every 30 to 50 ms) instead of per token cuts the work for any of them.
+
+### Memory leaks
+
+None in any of the three. Playing six turns and clearing the chat ten times, heap snapshots diffed between the second
+and the tenth cycle by object type show growth only in V8's own compiled code (about 110 KB, JIT warm-up); no array,
+string, map or closure type grows by 16 KB. lil2's module-level state is bounded caches: the last combined syntax
+(one entry), named references decoded by the browser build (at most 2,231), and the tag and property names KaTeX
+writes (its vocabulary; with KaTeX's `trust` and `\htmlData`, one entry per distinct attribute name).
+
+### Server rendering
+
+The whole 24-turn transcript rendered to HTML per request with `renderToString` (Node 20; 108,943 identical
+characters out):
+
+| | react-markdown | **lil2** |
+|---|---:|---:|
+| time per request (median) | 122 ms, 8.2 requests/s per core | **45 ms, 22.2 requests/s per core** |
+| JavaScript allocated per request | 82 MB | **55 MB** |
+| heap after 500 requests | 17.4 MB | **12.6 MB** |
+| process RSS | 123 MB | **115 MB** |
+| heap over 500 requests | flat (16.8 to 17.4 MB) | flat (12.3 to 12.6 MB) |
 
 ## Behaviour
 
