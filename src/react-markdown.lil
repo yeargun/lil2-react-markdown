@@ -220,6 +220,7 @@ export JsValue Markdown(JsValue options) {
   JsxOptions jsxOptions = new JsxOptions(Fragment, jsx, jsxs, componentTable(options["components"]));
   jsxOptions.styles = plugins.styles;
   jsxOptions.parseStyle = plugins.parseStyle;
+  jsxOptions.ignoreInvalidStyle = true;
   jsxOptions.passNode = true;
   return toJsxRuntime(state.hast, root, jsxOptions);
 }

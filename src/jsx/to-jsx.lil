@@ -20,6 +20,8 @@ export class JsxOptions {
   // properties (rehype-katex) installs it.
   bool styles;
   func(string)->JsValue parseStyle;
+  // Upstream's `ignoreInvalidStyle`: a style that does not parse becomes `{}` instead of throwing.
+  bool ignoreInvalidStyle;
 
   init(JsValue Fragment, JsValue jsx, JsValue jsxs, JsValue[] components) {
     this.Fragment = Fragment;
@@ -31,6 +33,7 @@ export class JsxOptions {
     this.tableCellAlignToStyle = true;
     this.styles = false;
     this.parseStyle = (string value) => value;
+    this.ignoreInvalidStyle = false;
   }
 }
 
@@ -96,6 +99,18 @@ export JsValue hastColumns(Hast h) {
   return [h.kind, h.parent, h.firstChild, h.nextSibling, h.tag, h.value, h.sOffset, h.eOffset, h.flags, h.meta, h.propHead, h.pProp, h.pKind, h.pStr, h.pNum, h.pNext, h.lineStarts, tagNames];
 }
 
+// hast-util-to-jsx-runtime's `parseStyle`.
+JsValue styleObject(JsxState state, string value) {
+  try {
+    return state.options.parseStyle(value);
+  } catch (JsValue error) {
+    if (state.options.ignoreInvalidStyle) {
+      return object {};
+    }
+    throw error;
+  }
+}
+
 JsValue createElementProps(JsxState state, int node) {
   Hast h = state.h;
   JsValue props = object {};
@@ -109,7 +124,7 @@ JsValue createElementProps(JsxState state, int node) {
     JsValue value = JS.undefined();
     if (kind == P_STRING) {
       // React only accepts `style` as an object.
-      value = if (name == state.styleProp) { state.options.parseStyle(h.pStr[prop]) } else { h.pStr[prop] };
+      value = if (name == state.styleProp) { styleObject(state, h.pStr[prop]) } else { h.pStr[prop] };
     } else if (kind == P_NUMBER) {
       value = h.pNum[prop];
     } else if (kind == P_BOOLEAN) {

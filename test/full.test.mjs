@@ -21,6 +21,7 @@ const docs = [
     {name: `fence ${i + 1}`, markdown: '```math\n' + f + '\n```'}
   ]),
   {name: 'math document', markdown: readFileSync(new URL('math-doc.md', import.meta.url), 'utf8')},
+  {name: 'invalid style (trust)', markdown: 'Styled $\\htmlStyle{a}{x}$ and $\\htmlStyle{color:red}{y}$ and $\\htmlStyle{b:;c}{z}$.'},
   {name: 'gfm and math', markdown: '| a | $b$ |\n| - | - |\n| ~~c~~ | $$d$$ |\n\n- [x] $e$\n\nwww.x.com $f$[^1]\n\n[^1]: $g$'},
   ...gfmCorpus().filter((_, i) => i % 7 === 0)
 ]

@@ -35,7 +35,7 @@
     "hast/properties.lil": "3a21343b334a9c26a4c63eb50bd8a3c529430d88c1c32fe7cb42c7eb33720f8d",
     "hast/to-hast.lil": "0212c9146ecf6ae68127fcda27291212f7f5acb74bf6561b1fd2b11a373a5328",
     "jsx/style.lil": "ebf3c2f06526f6563376c3c8bd5419cb85aafd7aae1e431ef77f0bd6c5bd153e",
-    "jsx/to-jsx.lil": "d586da79dfe5063b67d9c27e3f1637177daa7d0d8ebaa6327590eb4c48be8f28",
+    "jsx/to-jsx.lil": "b45190b92f2a0651c7f738d820786198fc4335259bcb0d619842cc23eec11ff3",
     "gfm/gfm.lil": "08af303de72c828630e6812dec819fc80452d2cadbe0df100d3e3791233a1b5b",
     "gfm/mdast-gfm.lil": "def3dca55c8a0a8b4fc23b81e8f5ec776cc83e37cba644fd4e4e62c897eb5e2e",
     "gfm/syntax/autolink-literal.lil": "5836e61d8fc794f669750192d102b40ad276edcaac62684a5820b8e655c2012f",
