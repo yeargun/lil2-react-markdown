@@ -6,7 +6,8 @@
     "jsx": "../lil2-hast-util-to-jsx-runtime/src/jsx",
     "gfm": "../lil2-remark-gfm/src/gfm",
     "math": "../lil2-remark-math/src/math",
-    "katex": "../lil2-rehype-katex/src/katex"
+    "katex": "../lil2-rehype-katex/src/katex",
+    "breaks": "../lil2-remark-breaks/src/breaks"
   },
   "pins": {
     "micromark/codes.lil": "d019f2dd7ebbd8d7ff3890d107825a79063336b0834903f71d2b00ac4e89f027",
@@ -51,6 +52,7 @@
     "katex/host.lil": "1ad8fd7f665dd4c4672285c1eb525f5ba38d292cc2c317b415dbafe01dc52539",
     "katex/parse.lil": "ebfd8e2695701a201f265cd24e9f8d9be3e4e5cecbcf80c30fe1ce4a0cda0770",
     "katex/rehype-katex.lil": "ee4c7627afd7d52b4f2b7d8c81d7b1572034874e8f2d690c84cba4df91313e70",
-    "katex/vocabulary.lil": "1d37a11d73d40888e4a1a98b8064c4bc134bb116021b330c2e53cf60751aef61"
+    "katex/vocabulary.lil": "1d37a11d73d40888e4a1a98b8064c4bc134bb116021b330c2e53cf60751aef61",
+    "breaks/breaks.lil": "201db491d6317ff98e20cd3fbbfe3c4cbb85641c9a60331aae35f6f767ba5d9e"
   }
 }

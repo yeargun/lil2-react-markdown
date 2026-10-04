@@ -1,0 +1,73 @@
+// remark-breaks 4.0.0 (mdast-util-newline-to-break 2.0.0 over mdast-util-find-and-replace 3.0.3): every line
+// ending in text becomes a `break`. The new nodes have no position; text left between breaks merges as
+// find-and-replace's `add` merges it.
+
+import { K_BREAK, K_TEXT, Tree } from "../mdast/tree.lil";
+
+// The nodes `value` becomes, or [] when it has no line ending.
+int[] split(Tree tree, string value) {
+  int[] nodes = [];
+  int start = 0;
+  int index = 0;
+  while (index < value.length) {
+    int code = value.codeUnitAt(index);
+    if (code == 10 || code == 13) {
+      if (index > start) {
+        int text = tree.create(K_TEXT, 0);
+        tree.s1[text] = value.slice(start, index);
+        nodes.push(text);
+      }
+      nodes.push(tree.create(K_BREAK, 0));
+      index += if (code == 13 && index + 1 < value.length && value.codeUnitAt(index + 1) == 10) { 2 } else { 1 };
+      start = index;
+    } else {
+      index++;
+    }
+  }
+  if (nodes.length > 0 && start < value.length) {
+    int text = tree.create(K_TEXT, 0);
+    tree.s1[text] = value.slice(start);
+    nodes.push(text);
+  }
+  return nodes;
+}
+
+// Puts `nodes` where `node` is under `parent`; returns the node after them.
+int replace(Tree tree, int parent, int node, int[] nodes) {
+  int previous = tree.previousSibling[node];
+  int next = tree.nextSibling[node];
+  int last = previous;
+  for (int child of nodes) {
+    tree.parent[child] = parent;
+    tree.previousSibling[child] = last;
+    if (last >= 0) {
+      tree.nextSibling[last] = child;
+    } else {
+      tree.firstChild[parent] = child;
+    }
+    last = child;
+  }
+  tree.nextSibling[last] = next;
+  if (next >= 0) {
+    tree.previousSibling[next] = last;
+  } else {
+    tree.lastChild[parent] = last;
+  }
+  return next;
+}
+
+void visit(Tree tree, int parent) {
+  int child = tree.firstChild[parent];
+  while (child >= 0) {
+    if (tree.kind[child] == K_TEXT) {
+      int[] nodes = split(tree, tree.s1[child]);
+      child = if (nodes.length > 0) { replace(tree, parent, child, nodes) } else { tree.nextSibling[child] };
+      continue;
+    }
+    visit(tree, child);
+    child = tree.nextSibling[child];
+  }
+}
+
+// `remarkBreaks()(tree)`.
+export func(Tree)->void newlineToBreak = (Tree tree) => visit(tree, 0);

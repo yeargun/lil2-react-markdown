@@ -1,7 +1,9 @@
-// The math plugins: remark-math 6.0.0 (option: the Markdown prop `singleDollarTextMath`, default true) and
-// rehype-katex 7.0.1 (option: the Markdown prop `katex`, KaTeX's options), registered when this module loads.
+// The full flavor's other plugins, registered when this module loads: remark-math 6.0.0 (option: the Markdown
+// prop `singleDollarTextMath`, default true), rehype-katex 7.0.1 (option: the Markdown prop `katex`, KaTeX's
+// options) and remark-breaks 4.0.0.
 
-import { PLUGIN_KATEX, PLUGIN_MATH, Pipeline, register } from "./plugins.lil";
+import { PLUGIN_BREAKS, PLUGIN_KATEX, PLUGIN_MATH, Pipeline, register } from "./plugins.lil";
+import { newlineToBreak } from "./breaks/breaks.lil";
 import { mathHast, mathMdast, mathSyntax } from "./math/math.lil";
 import { rehypeKatex } from "./katex/rehype-katex.lil";
 import { Hast } from "./hast/hast.lil";
@@ -23,3 +25,8 @@ void installKatex(Pipeline p) {
 
 export bool mathRegistered = register(PLUGIN_MATH, installMath);
 export bool katexRegistered = register(PLUGIN_KATEX, installKatex);
+void installBreaks(Pipeline p) {
+  p.remark.push(newlineToBreak);
+}
+
+export bool breaksRegistered = register(PLUGIN_BREAKS, installBreaks);

@@ -6,11 +6,12 @@ import Upstream from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
+import remarkBreaks from 'remark-breaks'
 import {jsx} from 'react/jsx-runtime'
 import {renderToStaticMarkup} from 'react-dom/server'
 import {formulas} from './formulas.mjs'
 import {gfmCorpus} from './gfm-corpus.mjs'
-const {Markdown, GFM, MATH, KATEX} = await import(new URL(process.env.LIL2_FULL ?? '../.dev/dist/full.js', import.meta.url))
+const {Markdown, GFM, MATH, KATEX, BREAKS} = await import(new URL(process.env.LIL2_FULL ?? '../.dev/dist/full.js', import.meta.url))
 console.warn = () => {}
 
 const docs = [
@@ -31,6 +32,8 @@ const optionSets = [
   [{remarkPlugins: [[remarkMath, {singleDollarTextMath: false}]], rehypePlugins: [[rehypeKatex, {output: 'mathml'}]]}, {plugins: [MATH, KATEX], singleDollarTextMath: false, katex: {output: 'mathml'}}],
   [{remarkPlugins: [remarkMath], rehypePlugins: [[rehypeKatex, {trust: true, errorColor: '#00f'}]]}, {plugins: [MATH, KATEX], katex: {trust: true, errorColor: '#00f'}}],
   [{rehypePlugins: [rehypeKatex]}, {plugins: [KATEX]}],
+  [{remarkPlugins: [remarkGfm, remarkBreaks, remarkMath], rehypePlugins: [rehypeKatex]}, {plugins: [GFM, BREAKS, MATH, KATEX]}],
+  [{remarkPlugins: [remarkBreaks]}, {plugins: [BREAKS]}],
 ]
 
 for (const [i, [options, lil2Options]] of optionSets.entries()) {
