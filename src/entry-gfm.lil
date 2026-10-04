@@ -1,0 +1,8 @@
+// lil2-react-markdown/gfm: the core with remark-gfm compiled in. `<Markdown plugins={[GFM]}>` applies it,
+// as `remarkPlugins={[remarkGfm]}` does upstream.
+import { Markdown, defaultUrlTransform } from "./react-markdown.lil";
+import { PLUGIN_GFM } from "./plugins.lil";
+import { gfmRegistered } from "./gfm-plugin.lil";
+
+export const int GFM = PLUGIN_GFM;
+export { Markdown, defaultUrlTransform };

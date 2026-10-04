@@ -6,22 +6,59 @@
   "type": "module",
   "license": "MIT",
   "author": "yeargun",
-  "repository": {"type": "git", "url": "git+https://github.com/yeargun/lil2-react-markdown.git"},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yeargun/lil2-react-markdown.git"
+  },
   "homepage": "https://yeargun.github.io/lil2-react-markdown/",
   "main": "./dist/react-markdown.js",
-  "exports": {".": "./dist/react-markdown.js"},
-  "peerDependencies": {"react": ">=18"},
+  "exports": {
+    ".": {
+      "convex": "./dist/react-markdown.js",
+      "deno": "./dist/react-markdown.js",
+      "edge-light": "./dist/react-markdown.js",
+      "react-native": "./dist/react-markdown.js",
+      "worker": "./dist/react-markdown.js",
+      "workerd": "./dist/react-markdown.js",
+      "browser": "./dist/browser/react-markdown.js",
+      "default": "./dist/react-markdown.js"
+    },
+    "./gfm": {
+      "convex": "./dist/gfm.js",
+      "deno": "./dist/gfm.js",
+      "edge-light": "./dist/gfm.js",
+      "react-native": "./dist/gfm.js",
+      "worker": "./dist/gfm.js",
+      "workerd": "./dist/gfm.js",
+      "browser": "./dist/browser/gfm.js",
+      "default": "./dist/gfm.js"
+    },
+    "./constants": {
+      "convex": "./dist/constants.js",
+      "deno": "./dist/constants.js",
+      "edge-light": "./dist/constants.js",
+      "react-native": "./dist/constants.js",
+      "worker": "./dist/constants.js",
+      "workerd": "./dist/constants.js",
+      "browser": "./dist/browser/constants.js",
+      "default": "./dist/constants.js"
+    }
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
   "scripts": {
     "check:sources": "node scripts/shared-sources.mjs",
     "build:dev": "node scripts/build.mjs --dev",
     "build": "node scripts/build.mjs",
-    "test": "npm run check:sources && node --test test/differential.test.mjs"
+    "test": "npm run check:sources && node --test test/differential.test.mjs test/gfm.test.mjs"
   },
   "devDependencies": {
     "character-entities": "2.0.2",
     "commonmark.json": "^0.31.0",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "react-markdown": "10.1.0"
+    "react-markdown": "10.1.0",
+    "remark-gfm": "^4.0.1"
   }
 }

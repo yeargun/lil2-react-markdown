@@ -1,0 +1,409 @@
+// micromark-extension-gfm-autolink-literal 2.1.0 (syntax).
+
+import { EOF, asciiAlpha, asciiAlphanumeric, asciiControl, charOf, markdownLineEndingOrSpace, unicodePunctuation, unicodeWhitespace } from "../../micromark/codes.lil";
+import { tLabelImage, tLabelLink } from "../../micromark/types.lil";
+import { C_NONE, F_BALANCED, Construct, Tokenizer, Tokens, eventToken, noState } from "../../micromark/tokenizer.lil";
+import { HOOK_TEXT, SyntaxExtension } from "../../micromark/parse.lil";
+import { C_EMAIL_AUTOLINK, C_PROTOCOL_AUTOLINK, C_WWW_AUTOLINK, tLiteralAutolink, tLiteralAutolinkEmail, tLiteralAutolinkHttp, tLiteralAutolinkWww } from "./ids.lil";
+
+
+// `_gfmAutolinkLiteralWalkedInto`.
+const int F_WALKED_INTO = 512;
+
+bool gfmAtext(int code) {
+  return code == 43 || code == 45 || code == 46 || code == 95 || asciiAlphanumeric(code);
+}
+
+bool previousWww(int code) {
+  return code == EOF || code == 40 || code == 42 || code == 95 || code == 91 || code == 93 || code == 126 || markdownLineEndingOrSpace(code);
+}
+
+bool previousProtocol(int code) {
+  return !asciiAlpha(code);
+}
+
+bool previousEmail(int code) {
+  return !(code == 47 || gfmAtext(code));
+}
+
+bool previousUnbalanced(Tokenizer t) {
+  Tokens tokens = t.tokens;
+  int[] events = t.events;
+  int index = events.length;
+  bool result = false;
+  while (index-- > 0) {
+    int token = eventToken(events[index]);
+    int type = tokens.type[token];
+    if ((type == tLabelLink || type == tLabelImage) && !tokens.has(token, F_BALANCED)) {
+      result = true;
+      break;
+    }
+    if (tokens.has(token, F_WALKED_INTO)) {
+      result = false;
+      break;
+    }
+  }
+  if (events.length > 0 && !result) {
+    tokens.set(eventToken(events[events.length - 1]), F_WALKED_INTO);
+  }
+  return result;
+}
+
+Construct wwwPrefix = makePartial((Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+  int size = 0;
+  func(int)->void wwwPrefixAfter = (int code) => {
+    if (code == EOF) {
+      nok(code);
+    } else {
+      ok(code);
+    }
+  };
+  func(int)->void wwwPrefixInside = noState;
+  wwwPrefixInside = (int code) => {
+    if ((code == 87 || code == 119) && size < 3) {
+      size++;
+      t.consume(code);
+      t.next = wwwPrefixInside;
+      return;
+    }
+    if (code == 46 && size == 3) {
+      t.consume(code);
+      t.next = wwwPrefixAfter;
+      return;
+    }
+    nok(code);
+  };
+  return wwwPrefixInside;
+});
+
+Construct makePartial(func(Tokenizer, bool, func(int)->void, func(int)->void)->func(int)->void tokenize) {
+  Construct c = new Construct(C_NONE, tokenize);
+  c.partial = true;
+  return c;
+}
+
+bool trailPunctuation(int code) {
+  return code == 33 || code == 34 || code == 39 || code == 41 || code == 42 || code == 44 || code == 46 || code == 58 || code == 59 || code == 63 || code == 95 || code == 126;
+}
+
+Construct trail = makePartial((Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+  func(int)->void trailState = noState;
+  func(int)->void trailCharacterReferenceInside = noState;
+  trailCharacterReferenceInside = (int code) => {
+    if (code == 59) {
+      t.consume(code);
+      t.next = trailState;
+      return;
+    }
+    if (asciiAlpha(code)) {
+      t.consume(code);
+      t.next = trailCharacterReferenceInside;
+      return;
+    }
+    nok(code);
+  };
+  func(int)->void trailCharacterReferenceStart = (int code) => {
+    if (asciiAlpha(code)) {
+      trailCharacterReferenceInside(code);
+    } else {
+      nok(code);
+    }
+  };
+  func(int)->void trailBracketAfter = (int code) => {
+    if (code == EOF || code == 40 || code == 91 || markdownLineEndingOrSpace(code) || unicodeWhitespace(code)) {
+      ok(code);
+      return;
+    }
+    trailState(code);
+  };
+  trailState = (int code) => {
+    if (trailPunctuation(code)) {
+      t.consume(code);
+      t.next = trailState;
+      return;
+    }
+    if (code == 38) {
+      t.consume(code);
+      t.next = trailCharacterReferenceStart;
+      return;
+    }
+    if (code == 93) {
+      t.consume(code);
+      t.next = trailBracketAfter;
+      return;
+    }
+    if (code == 60 || code == EOF || markdownLineEndingOrSpace(code) || unicodeWhitespace(code)) {
+      ok(code);
+      return;
+    }
+    nok(code);
+  };
+  return trailState;
+});
+
+Construct domain = makePartial((Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+  bool underscoreInLastSegment = false;
+  bool underscoreInLastLastSegment = false;
+  bool seen = false;
+  func(int)->void domainInside = noState;
+  func(int)->void domainAfter = (int code) => {
+    if (underscoreInLastLastSegment || underscoreInLastSegment || !seen) {
+      nok(code);
+      return;
+    }
+    ok(code);
+  };
+  func(int)->void domainAtPunctuation = (int code) => {
+    if (code == 95) {
+      underscoreInLastSegment = true;
+    } else {
+      underscoreInLastLastSegment = underscoreInLastSegment;
+      underscoreInLastSegment = false;
+    }
+    t.consume(code);
+    t.next = domainInside;
+  };
+  domainInside = (int code) => {
+    if (code == 46 || code == 95) {
+      t.checkOne(trail, domainAfter, domainAtPunctuation)(code);
+      return;
+    }
+    if (code == EOF || markdownLineEndingOrSpace(code) || unicodeWhitespace(code) || (code != 45 && unicodePunctuation(code))) {
+      domainAfter(code);
+      return;
+    }
+    seen = true;
+    t.consume(code);
+    t.next = domainInside;
+  };
+  return domainInside;
+});
+
+Construct path = makePartial((Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+  int sizeOpen = 0;
+  int sizeClose = 0;
+  func(int)->void pathInside = noState;
+  func(int)->void pathAtPunctuation = (int code) => {
+    if (code == 41) {
+      sizeClose++;
+    }
+    t.consume(code);
+    t.next = pathInside;
+  };
+  pathInside = (int code) => {
+    if (code == 40) {
+      sizeOpen++;
+      t.consume(code);
+      t.next = pathInside;
+      return;
+    }
+    if (code == 41 && sizeClose < sizeOpen) {
+      pathAtPunctuation(code);
+      return;
+    }
+    if (code == 33 || code == 34 || code == 38 || code == 39 || code == 41 || code == 42 || code == 44 || code == 46 || code == 58 || code == 59 || code == 60 || code == 63 || code == 93 || code == 95 || code == 126) {
+      t.checkOne(trail, ok, pathAtPunctuation)(code);
+      return;
+    }
+    if (code == EOF || markdownLineEndingOrSpace(code) || unicodeWhitespace(code)) {
+      ok(code);
+      return;
+    }
+    t.consume(code);
+    t.next = pathInside;
+  };
+  return pathInside;
+});
+
+Construct emailDomainDotTrail = makePartial((Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+  func(int)->void after = (int code) => {
+    if (asciiAlphanumeric(code)) {
+      nok(code);
+    } else {
+      ok(code);
+    }
+  };
+  return (int code) => {
+    t.consume(code);
+    t.next = after;
+  };
+});
+
+Construct emailAutolink = makeEmailAutolink();
+
+Construct makeEmailAutolink() {
+  Construct c = new Construct(C_EMAIL_AUTOLINK, (Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+    bool dot = false;
+    bool data = false;
+    func(int)->void emailDomain = noState;
+    func(int)->void emailDomainAfter = (int code) => {
+      if (data && dot && asciiAlpha(t.previous)) {
+        t.exit(tLiteralAutolinkEmail);
+        t.exit(tLiteralAutolink);
+        ok(code);
+        return;
+      }
+      nok(code);
+    };
+    func(int)->void emailDomainDot = (int code) => {
+      t.consume(code);
+      dot = true;
+      t.next = emailDomain;
+    };
+    emailDomain = (int code) => {
+      if (code == 46) {
+        t.checkOne(emailDomainDotTrail, emailDomainAfter, emailDomainDot)(code);
+        return;
+      }
+      if (code == 45 || code == 95 || asciiAlphanumeric(code)) {
+        data = true;
+        t.consume(code);
+        t.next = emailDomain;
+        return;
+      }
+      emailDomainAfter(code);
+    };
+    func(int)->void atext = noState;
+    atext = (int code) => {
+      if (gfmAtext(code)) {
+        t.consume(code);
+        t.next = atext;
+        return;
+      }
+      if (code == 64) {
+        t.consume(code);
+        t.next = emailDomain;
+        return;
+      }
+      nok(code);
+    };
+    return (int code) => {
+      if (!gfmAtext(code) || !previousEmail(t.previous) || previousUnbalanced(t)) {
+        nok(code);
+        return;
+      }
+      t.enter(tLiteralAutolink);
+      t.enter(tLiteralAutolinkEmail);
+      atext(code);
+    };
+  });
+  c.hasPrevious = true;
+  c.previous = (Tokenizer t, int code) => previousEmail(code);
+  return c;
+}
+
+Construct wwwAutolink = makeWwwAutolink();
+
+Construct makeWwwAutolink() {
+  Construct c = new Construct(C_WWW_AUTOLINK, (Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+    func(int)->void wwwAfter = (int code) => {
+      t.exit(tLiteralAutolinkWww);
+      t.exit(tLiteralAutolink);
+      ok(code);
+    };
+    return (int code) => {
+      if ((code != 87 && code != 119) || !previousWww(t.previous) || previousUnbalanced(t)) {
+        nok(code);
+        return;
+      }
+      t.enter(tLiteralAutolink);
+      t.enter(tLiteralAutolinkWww);
+      t.checkOne(wwwPrefix, t.attemptOne(domain, t.attemptOne(path, wwwAfter, noState), nok), nok)(code);
+    };
+  });
+  c.hasPrevious = true;
+  c.previous = (Tokenizer t, int code) => previousWww(code);
+  return c;
+}
+
+Construct protocolAutolink = makeProtocolAutolink();
+
+Construct makeProtocolAutolink() {
+  Construct c = new Construct(C_PROTOCOL_AUTOLINK, (Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+    string buffer = "";
+    bool seen = false;
+    func(int)->void protocolAfter = (int code) => {
+      t.exit(tLiteralAutolinkHttp);
+      t.exit(tLiteralAutolink);
+      ok(code);
+    };
+    func(int)->void afterProtocol = (int code) => {
+      if (code == EOF || asciiControl(code) || markdownLineEndingOrSpace(code) || unicodeWhitespace(code) || unicodePunctuation(code)) {
+        nok(code);
+        return;
+      }
+      t.attemptOne(domain, t.attemptOne(path, protocolAfter, noState), nok)(code);
+    };
+    func(int)->void protocolSlashesInside = noState;
+    protocolSlashesInside = (int code) => {
+      if (code == 47) {
+        t.consume(code);
+        if (seen) {
+          t.next = afterProtocol;
+          return;
+        }
+        seen = true;
+        t.next = protocolSlashesInside;
+        return;
+      }
+      nok(code);
+    };
+    func(int)->void protocolPrefixInside = noState;
+    protocolPrefixInside = (int code) => {
+      if (asciiAlpha(code) && buffer.length < 5) {
+        buffer += charOf(code);
+        t.consume(code);
+        t.next = protocolPrefixInside;
+        return;
+      }
+      if (code == 58) {
+        string protocol = buffer.toLowerCase();
+        if (protocol == "http" || protocol == "https") {
+          t.consume(code);
+          t.next = protocolSlashesInside;
+          return;
+        }
+      }
+      nok(code);
+    };
+    return (int code) => {
+      if ((code == 72 || code == 104) && previousProtocol(t.previous) && !previousUnbalanced(t)) {
+        t.enter(tLiteralAutolink);
+        t.enter(tLiteralAutolinkHttp);
+        buffer += charOf(code);
+        t.consume(code);
+        t.next = protocolPrefixInside;
+        return;
+      }
+      nok(code);
+    };
+  });
+  c.hasPrevious = true;
+  c.previous = (Tokenizer t, int code) => previousProtocol(code);
+  return c;
+}
+
+export SyntaxExtension gfmAutolinkLiteral() {
+  SyntaxExtension e = new SyntaxExtension();
+  int code = 48;
+  while (code < 123) {
+    if (code == 72 || code == 104) {
+      e.add(HOOK_TEXT, code, [emailAutolink, protocolAutolink]);
+    } else if (code == 87 || code == 119) {
+      e.add(HOOK_TEXT, code, [emailAutolink, wwwAutolink]);
+    } else {
+      e.add(HOOK_TEXT, code, [emailAutolink]);
+    }
+    code++;
+    if (code == 58) {
+      code = 65;
+    } else if (code == 91) {
+      code = 97;
+    }
+  }
+  e.add(HOOK_TEXT, 43, [emailAutolink]);
+  e.add(HOOK_TEXT, 45, [emailAutolink]);
+  e.add(HOOK_TEXT, 46, [emailAutolink]);
+  e.add(HOOK_TEXT, 95, [emailAutolink]);
+  return e;
+}

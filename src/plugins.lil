@@ -1,0 +1,64 @@
+// Compiled-in plugins. Each plugin is its own entry (`lil2-react-markdown/gfm`, …): loading it registers what
+// the plugin adds to the pipeline, and `plugins` lists plugin ids (ints), in upstream's order (remark
+// plugins, then rehype plugins). Plugin options are Markdown props.
+
+import { SyntaxExtension } from "./micromark/parse.lil";
+import { FromMarkdown } from "./mdast/from-markdown.lil";
+import { Tree } from "./mdast/tree.lil";
+import { ToHast } from "./hast/to-hast.lil";
+import { Hast } from "./hast/hast.lil";
+
+export const int PLUGIN_GFM = 1;
+export const int PLUGIN_MATH = 2;
+export const int PLUGIN_KATEX = 3;
+export const int PLUGIN_BREAKS = 4;
+
+// What the plugins of one render add to each stage, in order.
+export class Pipeline {
+  JsValue options;
+  SyntaxExtension[] syntax;
+  (func(FromMarkdown)->void)[] mdast;
+  (func(Tree)->void)[] remark;
+  (func(ToHast)->void)[] hast;
+  (func(Hast, int)->void)[] rehype;
+
+  init(JsValue options) {
+    this.options = options;
+    this.syntax = [];
+    this.mdast = [];
+    this.remark = [];
+    this.hast = [];
+    this.rehype = [];
+  }
+}
+
+func(Pipeline)->void unloaded = (Pipeline p) => {
+  throw "lil2-react-markdown: a plugin id in `plugins` belongs to an entry that is not loaded";
+};
+
+// Installers by plugin id.
+export (func(Pipeline)->void)[] installers = [];
+
+export bool register(int id, func(Pipeline)->void install) {
+  while (installers.length <= id) {
+    installers.push(unloaded);
+  }
+  installers[id] = install;
+  return true;
+}
+
+// The pipeline of the plugins listed in `ids` (a host array of plugin ids, or undefined).
+export Pipeline pipelineOf(JsValue options, JsValue ids) {
+  Pipeline p = new Pipeline(options);
+  if (JS.isArray(ids)) {
+    int length = JS.number(ids["length"]).toInt();
+    for (int index = 0; index < length; index++) {
+      int id = JS.number(ids[index]).toInt();
+      if (id <= 0 || id >= installers.length) {
+        unloaded(p);
+      }
+      installers[id](p);
+    }
+  }
+  return p;
+}

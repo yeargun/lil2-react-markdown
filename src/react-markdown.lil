@@ -8,10 +8,12 @@ extern JsValue Fragment;
 extern JsValue jsx;
 extern JsValue jsxs;
 
-import { fromMarkdownTree } from "./jsx/to-hast/mdast/index.lil";
-import { ToHast, installCommonmark, installGfm, toHast } from "./jsx/to-hast/to-hast.lil";
-import { H_ELEMENT, H_RAW, H_TEXT, HN_HAS_POSITION, P_NUMBER, PROP_HREF, PROP_SRC, TAG_A, TAG_IMG, TAG_INPUT, Hast, tagNames } from "./jsx/to-hast/hast.lil";
+import { parseTree } from "./mdast/parse.lil";
+import { Tree } from "./mdast/tree.lil";
+import { ToHast, toHast, toHastTree } from "./hast/to-hast.lil";
+import { H_ELEMENT, H_RAW, H_TEXT, HN_HAS_POSITION, P_NUMBER, PROP_HREF, PROP_SRC, TAG_A, TAG_IMG, TAG_INPUT, Hast, tagNames } from "./hast/hast.lil";
 import { JsxOptions, componentTable, hastColumns, toJsxRuntime } from "./jsx/to-jsx.lil";
+import { Pipeline, pipelineOf } from "./plugins.lil";
 
 Regex safeProtocol = new Regex("^(https?|ircs?|mailto|xmpp)$", "i");
 
@@ -199,10 +201,21 @@ void visitChildren(Post post, int parent) {
 export JsValue Markdown(JsValue options) {
   JsValue children = options["children"];
   string value = if (JS.typeOf(children) == "string") { JS.assume(children) } else { "" };
-  ToHast state = new ToHast(fromMarkdownTree(value), true);
-  installCommonmark(state);
-  installGfm(state);
+  // remark-parse with the plugins' syntax and mdast handlers, their mdast transforms, remark-rehype (to-hast's
+  // defaults handle GFM nodes), the plugins' handlers and hast transforms.
+  Pipeline plugins = pipelineOf(options, options["plugins"]);
+  Tree mdast = parseTree(value, plugins.syntax, plugins.mdast);
+  for (func(Tree)->void transform of plugins.remark) {
+    transform(mdast);
+  }
+  ToHast state = toHastTree(mdast, true);
+  for (func(ToHast)->void install of plugins.hast) {
+    install(state);
+  }
   int root = toHast(state);
+  for (func(Hast, int)->void transform of plugins.rehype) {
+    transform(state.hast, root);
+  }
   visitChildren(new Post(state.hast, options), root);
   JsxOptions jsxOptions = new JsxOptions(Fragment, jsx, jsxs, componentTable(options["components"]));
   jsxOptions.passNode = true;

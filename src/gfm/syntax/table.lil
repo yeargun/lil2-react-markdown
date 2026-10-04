@@ -1,0 +1,562 @@
+// micromark-extension-gfm-table 2.1.2: syntax, edit map and alignment inference.
+
+import { EOF, TAB_SIZE, markdownLineEnding, markdownLineEndingOrSpace, markdownSpace } from "../../micromark/codes.lil";
+import { tChunkText, tData, tLineEnding, tLinePrefix, tWhitespace } from "../../micromark/types.lil";
+import { C_CODE_INDENTED, CT_TEXT, Construct, Tokenizer, Tokens, defineResolver, enterEvent, eventToken, exitEvent, isEnter, newToken, noState } from "../../micromark/tokenizer.lil";
+import { factorySpace } from "../../micromark/factories.lil";
+import { ANY_CODE, HOOK_FLOW, SyntaxExtension } from "../../micromark/parse.lil";
+import { C_TABLE, tTable, tTableBody, tTableCellDivider, tTableContent, tTableData, tTableDelimiter, tTableDelimiterFiller, tTableDelimiterMarker, tTableDelimiterRow, tTableHead, tTableHeader, tTableRow } from "./ids.lil";
+import { ALIGN_CENTER, ALIGN_LEFT, ALIGN_NONE, ALIGN_RIGHT } from "../../mdast/tree.lil";
+
+
+// --- edit map -------------------------------------------------------------------------------
+
+class EditMap {
+  int[] at;
+  int[] remove;
+  (int[])[] add;
+  Map<int, int> index;
+
+  init() {
+    this.at = [];
+    this.remove = [];
+    this.add = [];
+    this.index = new Map<int, int>();
+  }
+
+  void edit(int at, int remove, int[] add) {
+    if (remove == 0 && add.length == 0) {
+      return;
+    }
+    int? existing = this.index.get(at);
+    if (existing != null) {
+      int entry = existing;
+      this.remove[entry] = this.remove[entry] + remove;
+      for (int event of add) {
+        this.add[entry].push(event);
+      }
+      return;
+    }
+    this.index.set(at, this.at.length);
+    this.at.push(at);
+    this.remove.push(remove);
+    this.add.push(add.slice());
+  }
+
+  void consume(int[] events) {
+    int count = this.at.length;
+    if (count == 0) {
+      return;
+    }
+    // Sort the edits by position (stable: equal positions cannot occur).
+    int[] order = [];
+    for (int i = 0; i < count; i++) {
+      order.push(i);
+    }
+    for (int i = 1; i < count; i++) {
+      int item = order[i];
+      int j = i - 1;
+      while (j >= 0 && this.at[order[j]] > this.at[item]) {
+        order[j + 1] = order[j];
+        j--;
+      }
+      order[j + 1] = item;
+    }
+    int[] result = [];
+    int position = 0;
+    for (int k = 0; k < count; k++) {
+      int entry = order[k];
+      while (position < this.at[entry]) {
+        result.push(events[position]);
+        position++;
+      }
+      for (int event of this.add[entry]) {
+        result.push(event);
+      }
+      position = this.at[entry] + this.remove[entry];
+    }
+    while (position < events.length) {
+      result.push(events[position]);
+      position++;
+    }
+    events.length = 0;
+    for (int event of result) {
+      events.push(event);
+    }
+    this.at.length = 0;
+    this.remove.length = 0;
+    this.add.length = 0;
+    this.index.clear();
+  }
+}
+
+// --- tokenizer ------------------------------------------------------------------------------
+
+Construct tableConstruct = new Construct(C_TABLE, (Tokenizer self, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+  int size = 0;
+  int sizeB = 0;
+  bool seen = false;
+
+  func(int)->void headRowBreak = noState;
+  func(int)->void headRowData = noState;
+  func(int)->void headDelimiterBefore = noState;
+  func(int)->void headDelimiterValueBefore = noState;
+  func(int)->void headDelimiterCellAfter = noState;
+  func(int)->void headDelimiterFiller = noState;
+  func(int)->void bodyRowBreak = noState;
+  func(int)->void bodyRowData = noState;
+
+  func(int)->void headRowEscape = (int code) => {
+    if (code == 92 || code == 124) {
+      self.consume(code);
+      self.next = headRowData;
+      return;
+    }
+    headRowData(code);
+  };
+  headRowData = (int code) => {
+    if (code == EOF || code == 124 || markdownLineEndingOrSpace(code)) {
+      self.exit(tData);
+      headRowBreak(code);
+      return;
+    }
+    self.consume(code);
+    self.next = if (code == 92) { headRowEscape } else { headRowData };
+  };
+  func(int)->void headDelimiterNok = (int code) => {
+    nok(code);
+  };
+  func(int)->void headDelimiterRightAlignmentAfter = (int code) => {
+    if (markdownSpace(code)) {
+      factorySpace(self, headDelimiterCellAfter, tWhitespace, 0)(code);
+      return;
+    }
+    headDelimiterCellAfter(code);
+  };
+  headDelimiterFiller = (int code) => {
+    if (code == 45) {
+      self.consume(code);
+      self.next = headDelimiterFiller;
+      return;
+    }
+    if (code == 58) {
+      seen = true;
+      self.exit(tTableDelimiterFiller);
+      self.enter(tTableDelimiterMarker);
+      self.consume(code);
+      self.exit(tTableDelimiterMarker);
+      self.next = headDelimiterRightAlignmentAfter;
+      return;
+    }
+    self.exit(tTableDelimiterFiller);
+    headDelimiterRightAlignmentAfter(code);
+  };
+  func(int)->void headDelimiterLeftAlignmentAfter = (int code) => {
+    if (code == 45) {
+      self.enter(tTableDelimiterFiller);
+      headDelimiterFiller(code);
+      return;
+    }
+    headDelimiterNok(code);
+  };
+  headDelimiterCellAfter = (int code) => {
+    if (code == 124) {
+      headDelimiterBefore(code);
+      return;
+    }
+    if (code == EOF || markdownLineEnding(code)) {
+      if (!seen || size != sizeB) {
+        headDelimiterNok(code);
+        return;
+      }
+      self.exit(tTableDelimiterRow);
+      self.exit(tTableHead);
+      ok(code);
+      return;
+    }
+    headDelimiterNok(code);
+  };
+  headDelimiterValueBefore = (int code) => {
+    if (code == 58) {
+      sizeB += 1;
+      seen = true;
+      self.enter(tTableDelimiterMarker);
+      self.consume(code);
+      self.exit(tTableDelimiterMarker);
+      self.next = headDelimiterLeftAlignmentAfter;
+      return;
+    }
+    if (code == 45) {
+      sizeB += 1;
+      headDelimiterLeftAlignmentAfter(code);
+      return;
+    }
+    if (code == EOF || markdownLineEnding(code)) {
+      headDelimiterCellAfter(code);
+      return;
+    }
+    headDelimiterNok(code);
+  };
+  func(int)->void headDelimiterCellBefore = (int code) => {
+    if (markdownSpace(code)) {
+      factorySpace(self, headDelimiterValueBefore, tWhitespace, 0)(code);
+      return;
+    }
+    headDelimiterValueBefore(code);
+  };
+  headDelimiterBefore = (int code) => {
+    if (code == 45 || code == 58) {
+      headDelimiterValueBefore(code);
+      return;
+    }
+    if (code == 124) {
+      seen = true;
+      self.enter(tTableCellDivider);
+      self.consume(code);
+      self.exit(tTableCellDivider);
+      self.next = headDelimiterCellBefore;
+      return;
+    }
+    headDelimiterNok(code);
+  };
+  func(int)->void headDelimiterStart = (int code) => {
+    self.interrupt = false;
+    if (self.parser.isLazy(self.line)) {
+      nok(code);
+      return;
+    }
+    self.enter(tTableDelimiterRow);
+    seen = false;
+    if (markdownSpace(code)) {
+      int max = if (self.parser.constructs.disabled[C_CODE_INDENTED]) { 0 } else { TAB_SIZE };
+      factorySpace(self, headDelimiterBefore, tLinePrefix, max)(code);
+      return;
+    }
+    headDelimiterBefore(code);
+  };
+  headRowBreak = (int code) => {
+    if (code == EOF) {
+      nok(code);
+      return;
+    }
+    if (markdownLineEnding(code)) {
+      if (sizeB > 1) {
+        sizeB = 0;
+        self.interrupt = true;
+        self.exit(tTableRow);
+        self.enter(tLineEnding);
+        self.consume(code);
+        self.exit(tLineEnding);
+        self.next = headDelimiterStart;
+        return;
+      }
+      nok(code);
+      return;
+    }
+    if (markdownSpace(code)) {
+      factorySpace(self, headRowBreak, tWhitespace, 0)(code);
+      return;
+    }
+    sizeB += 1;
+    if (seen) {
+      seen = false;
+      size += 1;
+    }
+    if (code == 124) {
+      self.enter(tTableCellDivider);
+      self.consume(code);
+      self.exit(tTableCellDivider);
+      seen = true;
+      self.next = headRowBreak;
+      return;
+    }
+    self.enter(tData);
+    headRowData(code);
+  };
+  func(int)->void headRowStart = (int code) => {
+    if (code == 124) {
+      headRowBreak(code);
+      return;
+    }
+    seen = true;
+    sizeB += 1;
+    headRowBreak(code);
+  };
+  func(int)->void headRowBefore = (int code) => {
+    self.enter(tTableHead);
+    self.enter(tTableRow);
+    headRowStart(code);
+  };
+  func(int)->void bodyRowEscape = (int code) => {
+    if (code == 92 || code == 124) {
+      self.consume(code);
+      self.next = bodyRowData;
+      return;
+    }
+    bodyRowData(code);
+  };
+  bodyRowData = (int code) => {
+    if (code == EOF || code == 124 || markdownLineEndingOrSpace(code)) {
+      self.exit(tData);
+      bodyRowBreak(code);
+      return;
+    }
+    self.consume(code);
+    self.next = if (code == 92) { bodyRowEscape } else { bodyRowData };
+  };
+  bodyRowBreak = (int code) => {
+    if (code == 124) {
+      self.enter(tTableCellDivider);
+      self.consume(code);
+      self.exit(tTableCellDivider);
+      self.next = bodyRowBreak;
+      return;
+    }
+    if (code == EOF || markdownLineEnding(code)) {
+      self.exit(tTableRow);
+      ok(code);
+      return;
+    }
+    if (markdownSpace(code)) {
+      factorySpace(self, bodyRowBreak, tWhitespace, 0)(code);
+      return;
+    }
+    self.enter(tData);
+    bodyRowData(code);
+  };
+  func(int)->void bodyRowStart = (int code) => {
+    self.enter(tTableRow);
+    bodyRowBreak(code);
+  };
+  return (int code) => {
+    Tokens tokens = self.tokens;
+    int index = self.events.length - 1;
+    while (index > -1) {
+      int type = tokens.type[eventToken(self.events[index])];
+      if (type == tLineEnding || type == tLinePrefix) {
+        index--;
+      } else {
+        break;
+      }
+    }
+    int tail = if (index > -1) { tokens.type[eventToken(self.events[index])] } else { -1 };
+    bool body = tail == tTableHead || tail == tTableRow;
+    if (body && self.parser.isLazy(self.line)) {
+      nok(code);
+      return;
+    }
+    if (body) {
+      bodyRowStart(code);
+    } else {
+      headRowBefore(code);
+    }
+  };
+});
+
+// --- resolver -------------------------------------------------------------------------------
+
+// `getPoint`: the start of an enter event's token, the end of an exit event's token, as
+// (line, column, offset, index) copied into `target`'s start or end.
+void startAtPoint(Tokens tokens, int target, int event) {
+  int token = eventToken(event);
+  if (isEnter(event)) {
+    tokens.startAtStartOf(target, token);
+  } else {
+    tokens.startAtEndOf(target, token);
+  }
+}
+
+void endAtPoint(Tokens tokens, int target, int event) {
+  int token = eventToken(event);
+  if (isEnter(event)) {
+    tokens.endAtStartOf(target, token);
+  } else {
+    tokens.endAtEndOf(target, token);
+  }
+}
+
+// Returns the open cell (or -1).
+int flushCell(EditMap map, Tokenizer t, int[] events, int[] range, int rowKind, int rowEnd, int previousCell) {
+  Tokens tokens = t.tokens;
+  int groupName = if (rowKind == 1) { tTableHeader } else { if (rowKind == 2) { tTableDelimiter } else { tTableData } };
+  if (range[0] != 0) {
+    endAtPoint(tokens, previousCell, events[range[0]]);
+    map.edit(range[0], 0, [exitEvent(previousCell)]);
+  }
+  int cell = newToken(t, groupName);
+  startAtPoint(tokens, cell, events[range[1]]);
+  endAtPoint(tokens, cell, events[range[1]]);
+  map.edit(range[1], 0, [enterEvent(cell)]);
+  if (range[2] != 0) {
+    int valueToken = newToken(t, tTableContent);
+    startAtPoint(tokens, valueToken, events[range[2]]);
+    endAtPoint(tokens, valueToken, events[range[3]]);
+    map.edit(range[2], 0, [enterEvent(valueToken)]);
+    if (rowKind != 2) {
+      int start = eventToken(events[range[2]]);
+      int end = eventToken(events[range[3]]);
+      tokens.endAtEndOf(start, end);
+      tokens.type[start] = tChunkText;
+      tokens.contentType[start] = CT_TEXT;
+      if (range[3] > range[2] + 1) {
+        int[] none = [];
+        map.edit(range[2] + 1, range[3] - range[2] - 1, none);
+      }
+    }
+    map.edit(range[3] + 1, 0, [exitEvent(valueToken)]);
+  }
+  if (rowEnd >= 0) {
+    endAtPoint(tokens, cell, events[rowEnd]);
+    map.edit(rowEnd, 0, [exitEvent(cell)]);
+    return -1;
+  }
+  return cell;
+}
+
+void flushTableEnd(EditMap map, Tokenizer t, int[] events, int index, int table, int tableBody) {
+  Tokens tokens = t.tokens;
+  int[] exits = [];
+  if (tableBody >= 0) {
+    endAtPoint(tokens, tableBody, events[index]);
+    exits.push(exitEvent(tableBody));
+  }
+  endAtPoint(tokens, table, events[index]);
+  exits.push(exitEvent(table));
+  map.edit(index + 1, 0, exits);
+}
+
+// infer.js: each column's alignment, appended to `tokens.aux` as a run (the count, then one `ALIGN_*` per
+// column). Returns the run's offset, which the table token keeps in `marker`.
+int gfmTableAlign(Tokens tokens, int[] events, int start) {
+  int[] aux = tokens.aux;
+  int at = aux.length;
+  aux.push(0);
+  bool inDelimiterRow = false;
+  int index = start;
+  while (index < events.length) {
+    int event = events[index];
+    int type = tokens.type[eventToken(event)];
+    if (inDelimiterRow) {
+      if (isEnter(event)) {
+        if (type == tTableContent) {
+          aux.push(if (tokens.type[eventToken(events[index + 1])] == tTableDelimiterMarker) { ALIGN_LEFT } else { ALIGN_NONE });
+        }
+      } else if (type == tTableContent) {
+        if (tokens.type[eventToken(events[index - 1])] == tTableDelimiterMarker) {
+          int last = aux.length - 1;
+          aux[last] = if (aux[last] == ALIGN_LEFT) { ALIGN_CENTER } else { ALIGN_RIGHT };
+        }
+      } else if (type == tTableDelimiterRow) {
+        break;
+      }
+    } else if (isEnter(event) && type == tTableDelimiterRow) {
+      inDelimiterRow = true;
+    }
+    index += 1;
+  }
+  aux[at] = aux.length - at - 1;
+  return at;
+}
+
+int[] resolveTable(int[] events, Tokenizer t) {
+  Tokens tokens = t.tokens;
+  int index = -1;
+  bool inFirstCellAwaitingPipe = true;
+  int rowKind = 0;
+  int[] lastCell = [0, 0, 0, 0];
+  int[] cell = [0, 0, 0, 0];
+  bool afterHeadAwaitingFirstBodyRow = false;
+  int lastTableEnd = 0;
+  int currentTable = -1;
+  int currentBody = -1;
+  int currentCell = -1;
+  EditMap map = new EditMap();
+  while (++index < events.length) {
+    int event = events[index];
+    int token = eventToken(event);
+    int type = tokens.type[token];
+    if (isEnter(event)) {
+      if (type == tTableHead) {
+        afterHeadAwaitingFirstBodyRow = false;
+        if (lastTableEnd != 0) {
+          flushTableEnd(map, t, events, lastTableEnd, currentTable, currentBody);
+          currentBody = -1;
+          lastTableEnd = 0;
+        }
+        currentTable = newToken(t, tTable);
+        tokens.startAtStartOf(currentTable, token);
+        tokens.endAtEndOf(currentTable, token);
+        map.edit(index, 0, [enterEvent(currentTable)]);
+      } else if (type == tTableRow || type == tTableDelimiterRow) {
+        inFirstCellAwaitingPipe = true;
+        currentCell = -1;
+        lastCell = [0, 0, 0, 0];
+        cell = [0, index + 1, 0, 0];
+        if (afterHeadAwaitingFirstBodyRow) {
+          afterHeadAwaitingFirstBodyRow = false;
+          currentBody = newToken(t, tTableBody);
+          tokens.startAtStartOf(currentBody, token);
+          tokens.endAtEndOf(currentBody, token);
+          map.edit(index, 0, [enterEvent(currentBody)]);
+        }
+        rowKind = if (type == tTableDelimiterRow) { 2 } else { if (currentBody >= 0) { 3 } else { 1 } };
+      } else if (rowKind != 0 && (type == tData || type == tTableDelimiterMarker || type == tTableDelimiterFiller)) {
+        inFirstCellAwaitingPipe = false;
+        if (cell[2] == 0) {
+          if (lastCell[1] != 0) {
+            cell[0] = cell[1];
+            currentCell = flushCell(map, t, events, lastCell, rowKind, -1, currentCell);
+            lastCell = [0, 0, 0, 0];
+          }
+          cell[2] = index;
+        }
+      } else if (type == tTableCellDivider) {
+        if (inFirstCellAwaitingPipe) {
+          inFirstCellAwaitingPipe = false;
+        } else {
+          if (lastCell[1] != 0) {
+            cell[0] = cell[1];
+            currentCell = flushCell(map, t, events, lastCell, rowKind, -1, currentCell);
+          }
+          lastCell = cell;
+          cell = [lastCell[1], index, 0, 0];
+        }
+      }
+    } else if (type == tTableHead) {
+      afterHeadAwaitingFirstBodyRow = true;
+      lastTableEnd = index;
+    } else if (type == tTableRow || type == tTableDelimiterRow) {
+      lastTableEnd = index;
+      if (lastCell[1] != 0) {
+        cell[0] = cell[1];
+        currentCell = flushCell(map, t, events, lastCell, rowKind, index, currentCell);
+      } else if (cell[1] != 0) {
+        currentCell = flushCell(map, t, events, cell, rowKind, index, currentCell);
+      }
+      rowKind = 0;
+    } else if (rowKind != 0 && (type == tData || type == tTableDelimiterMarker || type == tTableDelimiterFiller)) {
+      cell[3] = index;
+    }
+  }
+  if (lastTableEnd != 0) {
+    flushTableEnd(map, t, events, lastTableEnd, currentTable, currentBody);
+  }
+  map.consume(events);
+  index = -1;
+  while (++index < events.length) {
+    int event = events[index];
+    if (isEnter(event) && tokens.type[eventToken(event)] == tTable) {
+      tokens.marker[eventToken(event)] = gfmTableAlign(tokens, events, index);
+    }
+  }
+  return events;
+}
+
+int tableResolver = defineResolver(resolveTable);
+
+export SyntaxExtension gfmTable() {
+  tableConstruct.resolveAll = tableResolver;
+  SyntaxExtension e = new SyntaxExtension();
+  e.add(HOOK_FLOW, ANY_CODE, [tableConstruct]);
+  return e;
+}

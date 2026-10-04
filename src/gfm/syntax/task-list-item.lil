@@ -1,0 +1,79 @@
+// micromark-extension-gfm-task-list-item 2.1.0.
+
+import { EOF, markdownLineEnding, markdownLineEndingOrSpace, markdownSpace } from "../../micromark/codes.lil";
+import { tWhitespace } from "../../micromark/types.lil";
+import { C_NONE, Construct, Tokenizer, noState } from "../../micromark/tokenizer.lil";
+import { factorySpace } from "../../micromark/factories.lil";
+import { HOOK_TEXT, SyntaxExtension } from "../../micromark/parse.lil";
+import { C_TASKLIST_CHECK, tTaskListCheck, tTaskListCheckMarker, tTaskListCheckValueChecked, tTaskListCheckValueUnchecked } from "./ids.lil";
+
+
+Construct spaceThenNonSpace = new Construct(C_NONE, (Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+  func(int)->void after = (int code) => {
+    if (code == EOF) {
+      nok(code);
+    } else {
+      ok(code);
+    }
+  };
+  return factorySpace(t, after, tWhitespace, 0);
+});
+
+Construct tasklistCheck = new Construct(C_TASKLIST_CHECK, (Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+  func(int)->void after = (int code) => {
+    if (markdownLineEnding(code)) {
+      ok(code);
+      return;
+    }
+    if (markdownSpace(code)) {
+      t.checkOne(spaceThenNonSpace, ok, nok)(code);
+      return;
+    }
+    nok(code);
+  };
+  func(int)->void close = (int code) => {
+    if (code == 93) {
+      t.enter(tTaskListCheckMarker);
+      t.consume(code);
+      t.exit(tTaskListCheckMarker);
+      t.exit(tTaskListCheck);
+      t.next = after;
+      return;
+    }
+    nok(code);
+  };
+  func(int)->void inside = (int code) => {
+    if (markdownLineEndingOrSpace(code)) {
+      t.enter(tTaskListCheckValueUnchecked);
+      t.consume(code);
+      t.exit(tTaskListCheckValueUnchecked);
+      t.next = close;
+      return;
+    }
+    if (code == 88 || code == 120) {
+      t.enter(tTaskListCheckValueChecked);
+      t.consume(code);
+      t.exit(tTaskListCheckValueChecked);
+      t.next = close;
+      return;
+    }
+    nok(code);
+  };
+  return (int code) => {
+    if (t.previous != EOF || !t.gfmTasklistFirstContentOfListItem) {
+      nok(code);
+      return;
+    }
+    t.enter(tTaskListCheck);
+    t.enter(tTaskListCheckMarker);
+    t.consume(code);
+    t.exit(tTaskListCheckMarker);
+    t.next = inside;
+  };
+});
+
+export SyntaxExtension gfmTaskListItem() {
+  SyntaxExtension e = new SyntaxExtension();
+  e.add(HOOK_TEXT, 91, [tasklistCheck]);
+  return e;
+}

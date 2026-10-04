@@ -1,7 +1,7 @@
 // mdast-util-to-hast 13.2.1: an mdast arena to a hast arena (CommonMark handlers; GFM adds its own).
 
-import { ALIGN_NONE, K_DELETE, K_FOOTNOTE_DEFINITION, K_FOOTNOTE_REFERENCE, K_TABLE, K_TABLE_CELL, K_TABLE_ROW, K_BLOCKQUOTE, K_BREAK, K_CODE, K_DEFINITION, K_EMPHASIS, K_HEADING, K_HTML, K_IMAGE, K_IMAGE_REFERENCE, K_INLINE_CODE, K_LINK, K_LINK_REFERENCE, K_LIST, K_LIST_ITEM, K_PARAGRAPH, K_ROOT, K_STRONG, K_TEXT, K_THEMATIC_BREAK, N_CHECKED, N_CHECKED_SET, N_HAS_POSITION, N_HAS_VALUE, N_ORDERED, N_S2_SET, N_S3_SET, N_SPREAD, N_START_SET, Tree } from "./mdast/tree.lil";
-import { normalizeUri } from "./mdast/micromark/util.lil";
+import { ALIGN_NONE, K_DELETE, K_FOOTNOTE_DEFINITION, K_FOOTNOTE_REFERENCE, K_TABLE, K_TABLE_CELL, K_TABLE_ROW, K_BLOCKQUOTE, K_BREAK, K_CODE, K_DEFINITION, K_EMPHASIS, K_HEADING, K_HTML, K_IMAGE, K_IMAGE_REFERENCE, K_INLINE_CODE, K_LINK, K_LINK_REFERENCE, K_LIST, K_LIST_ITEM, K_PARAGRAPH, K_ROOT, K_STRONG, K_TEXT, K_THEMATIC_BREAK, N_CHECKED, N_CHECKED_SET, N_HAS_POSITION, N_HAS_VALUE, N_ORDERED, N_S2_SET, N_S3_SET, N_SPREAD, N_START_SET, Tree } from "../mdast/tree.lil";
+import { normalizeUri } from "../micromark/util.lil";
 import { H_ELEMENT, H_RAW, H_ROOT, H_TEXT, HN_META, HN_TASK_LIST_ITEM, KW_CHECKBOX, PROP_ALIGN, PROP_ALT, PROP_ARIA_DESCRIBED_BY, PROP_ARIA_LABEL, PROP_CHECKED, PROP_CLASS_NAME, PROP_DATA_FOOTNOTES, PROP_DATA_FOOTNOTE_BACKREF, PROP_DATA_FOOTNOTE_REF, PROP_DISABLED, PROP_HREF, PROP_ID, PROP_SRC, PROP_START, PROP_TITLE, PROP_TYPE, TAG_A, TAG_BLOCKQUOTE, TAG_BR, TAG_CODE, TAG_DEL, TAG_DIV, TAG_EM, TAG_H1, TAG_H2, TAG_HR, TAG_IMG, TAG_INPUT, TAG_LI, TAG_NONE, TAG_OL, TAG_P, TAG_PRE, TAG_SECTION, TAG_STRONG, TAG_SUP, TAG_TABLE, TAG_TBODY, TAG_TD, TAG_TH, TAG_THEAD, TAG_TR, TAG_UL, Hast } from "./hast.lil";
 
 func(ToHast, int, int)->int[] unknownHandler = (ToHast state, int node, int parent) => {
@@ -615,4 +615,13 @@ export int toHast(ToHast state) {
     state.hast.append(root, foot);
   }
   return root;
+}
+
+// Converts `mdast` (root at node 0) with the CommonMark and GFM handlers, as upstream's defaults do.
+// Returns the state; its `hast` holds the tree, whose root is the returned `root`.
+export ToHast toHastTree(Tree mdast, bool allowDangerousHtml) {
+  ToHast state = new ToHast(mdast, allowDangerousHtml);
+  installCommonmark(state);
+  installGfm(state);
+  return state;
 }

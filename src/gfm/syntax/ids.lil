@@ -1,0 +1,51 @@
+// The GFM range of the family's int vocabularies: token types (from `TYPES_GFM`) and construct ids (from
+// `CONSTRUCTS_GFM`, upstream's construct names, which `disable` lists).
+
+import { TYPES_GFM } from "../../micromark/types.lil";
+import { CONSTRUCTS_GFM } from "../../micromark/tokenizer.lil";
+
+export const int tStrikethrough = TYPES_GFM;
+export const int tStrikethroughText = TYPES_GFM + 1;
+export const int tStrikethroughSequence = TYPES_GFM + 2;
+export const int tStrikethroughSequenceTemporary = TYPES_GFM + 3;
+export const int tTable = TYPES_GFM + 4;
+export const int tTableBody = TYPES_GFM + 5;
+export const int tTableHead = TYPES_GFM + 6;
+export const int tTableRow = TYPES_GFM + 7;
+export const int tTableDelimiterRow = TYPES_GFM + 8;
+export const int tTableCellDivider = TYPES_GFM + 9;
+export const int tTableDelimiterMarker = TYPES_GFM + 10;
+export const int tTableDelimiterFiller = TYPES_GFM + 11;
+export const int tTableHeader = TYPES_GFM + 12;
+export const int tTableDelimiter = TYPES_GFM + 13;
+export const int tTableData = TYPES_GFM + 14;
+export const int tTableContent = TYPES_GFM + 15;
+export const int tTaskListCheck = TYPES_GFM + 16;
+export const int tTaskListCheckMarker = TYPES_GFM + 17;
+export const int tTaskListCheckValueUnchecked = TYPES_GFM + 18;
+export const int tTaskListCheckValueChecked = TYPES_GFM + 19;
+export const int tLiteralAutolink = TYPES_GFM + 20;
+export const int tLiteralAutolinkEmail = TYPES_GFM + 21;
+export const int tLiteralAutolinkWww = TYPES_GFM + 22;
+export const int tLiteralAutolinkHttp = TYPES_GFM + 23;
+export const int tGfmFootnoteCall = TYPES_GFM + 24;
+export const int tGfmFootnoteCallLabelMarker = TYPES_GFM + 25;
+export const int tGfmFootnoteCallMarker = TYPES_GFM + 26;
+export const int tGfmFootnoteCallString = TYPES_GFM + 27;
+export const int tGfmFootnoteDefinition = TYPES_GFM + 28;
+export const int tGfmFootnoteDefinitionLabel = TYPES_GFM + 29;
+export const int tGfmFootnoteDefinitionLabelMarker = TYPES_GFM + 30;
+export const int tGfmFootnoteDefinitionMarker = TYPES_GFM + 31;
+export const int tGfmFootnoteDefinitionLabelString = TYPES_GFM + 32;
+export const int tGfmFootnoteDefinitionWhitespace = TYPES_GFM + 33;
+export const int tGfmFootnoteDefinitionIndent = TYPES_GFM + 34;
+
+export const int C_STRIKETHROUGH = CONSTRUCTS_GFM;
+export const int C_TABLE = CONSTRUCTS_GFM + 1;
+export const int C_TASKLIST_CHECK = CONSTRUCTS_GFM + 2;
+export const int C_EMAIL_AUTOLINK = CONSTRUCTS_GFM + 3;
+export const int C_WWW_AUTOLINK = CONSTRUCTS_GFM + 4;
+export const int C_PROTOCOL_AUTOLINK = CONSTRUCTS_GFM + 5;
+export const int C_GFM_FOOTNOTE_DEFINITION = CONSTRUCTS_GFM + 6;
+export const int C_GFM_FOOTNOTE_CALL = CONSTRUCTS_GFM + 7;
+export const int C_GFM_POTENTIAL_FOOTNOTE_CALL = CONSTRUCTS_GFM + 8;

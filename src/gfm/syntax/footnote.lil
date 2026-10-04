@@ -1,0 +1,263 @@
+// micromark-extension-gfm-footnote 2.1.0 (syntax).
+
+import { EOF, TAB_SIZE, markdownLineEndingOrSpace } from "../../micromark/codes.lil";
+import { tChunkString, tData, tDefinitionMarker, tImage, tLabel, tLabelImage, tLabelLink, tLink } from "../../micromark/types.lil";
+import { ID_FOOTNOTE, C_NONE, CT_STRING, F_BALANCED, F_CONTAINER, Construct, Tokenizer, Tokens, enterEvent, eventToken, exitEvent, isEnter, newToken, noState, serializeToken, splice } from "../../micromark/tokenizer.lil";
+import { factorySpace } from "../../micromark/factories.lil";
+import { HOOK_DOCUMENT, HOOK_TEXT, SyntaxExtension } from "../../micromark/parse.lil";
+import { blankLine } from "../../micromark/constructs/basic.lil";
+import { normalizeIdentifier } from "../../micromark/util.lil";
+import { C_GFM_FOOTNOTE_CALL, C_GFM_FOOTNOTE_DEFINITION, C_GFM_POTENTIAL_FOOTNOTE_CALL, tGfmFootnoteCall, tGfmFootnoteCallLabelMarker, tGfmFootnoteCallMarker, tGfmFootnoteCallString, tGfmFootnoteDefinition, tGfmFootnoteDefinitionIndent, tGfmFootnoteDefinitionLabel, tGfmFootnoteDefinitionLabelMarker, tGfmFootnoteDefinitionLabelString, tGfmFootnoteDefinitionMarker, tGfmFootnoteDefinitionWhitespace } from "./ids.lil";
+
+
+const int LINK_REFERENCE_SIZE_MAX = 999;
+
+Construct indent = makeIndent();
+
+Construct makeIndent() {
+  Construct c = new Construct(C_NONE, (Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+    func(int)->void afterPrefix = (int code) => {
+      if (t.events.length > 0) {
+        int tail = eventToken(t.events[t.events.length - 1]);
+        if (t.tokens.type[tail] == tGfmFootnoteDefinitionIndent && serializeToken(t.parser, tail, true).length == TAB_SIZE) {
+          ok(code);
+          return;
+        }
+      }
+      nok(code);
+    };
+    return factorySpace(t, afterPrefix, tGfmFootnoteDefinitionIndent, TAB_SIZE + 1);
+  });
+  c.partial = true;
+  return c;
+}
+
+Construct definition = makeDefinition();
+
+Construct makeDefinition() {
+  Construct c = new Construct(C_GFM_FOOTNOTE_DEFINITION, (Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+    string identifier = "";
+    int size = 0;
+    bool data = false;
+    func(int)->void whitespaceAfter = (int code) => {
+      ok(code);
+    };
+    func(int)->void labelAfter = (int code) => {
+      if (code == 58) {
+        t.enter(tDefinitionMarker);
+        t.consume(code);
+        t.exit(tDefinitionMarker);
+        t.parser.define(identifier, ID_FOOTNOTE);
+        t.next = factorySpace(t, whitespaceAfter, tGfmFootnoteDefinitionWhitespace, 0);
+        return;
+      }
+      nok(code);
+    };
+    func(int)->void labelInside = noState;
+    func(int)->void labelEscape = (int code) => {
+      if (code == 91 || code == 92 || code == 93) {
+        t.consume(code);
+        size++;
+        t.next = labelInside;
+        return;
+      }
+      labelInside(code);
+    };
+    labelInside = (int code) => {
+      if (size > LINK_REFERENCE_SIZE_MAX || (code == 93 && !data) || code == EOF || code == 91 || markdownLineEndingOrSpace(code)) {
+        nok(code);
+        return;
+      }
+      if (code == 93) {
+        t.exit(tChunkString);
+        int token = t.exit(tGfmFootnoteDefinitionLabelString);
+        identifier = normalizeIdentifier(t.sliceSerialize(token, false));
+        t.enter(tGfmFootnoteDefinitionLabelMarker);
+        t.consume(code);
+        t.exit(tGfmFootnoteDefinitionLabelMarker);
+        t.exit(tGfmFootnoteDefinitionLabel);
+        t.next = labelAfter;
+        return;
+      }
+      if (!markdownLineEndingOrSpace(code)) {
+        data = true;
+      }
+      size++;
+      t.consume(code);
+      t.next = if (code == 92) { labelEscape } else { labelInside };
+    };
+    func(int)->void labelAtMarker = (int code) => {
+      if (code == 94) {
+        t.enter(tGfmFootnoteDefinitionMarker);
+        t.consume(code);
+        t.exit(tGfmFootnoteDefinitionMarker);
+        t.enter(tGfmFootnoteDefinitionLabelString);
+        int chunk = t.enter(tChunkString);
+        t.tokens.contentType[chunk] = CT_STRING;
+        t.next = labelInside;
+        return;
+      }
+      nok(code);
+    };
+    return (int code) => {
+      int token = t.enter(tGfmFootnoteDefinition);
+      t.tokens.set(token, F_CONTAINER);
+      t.enter(tGfmFootnoteDefinitionLabel);
+      t.enter(tGfmFootnoteDefinitionLabelMarker);
+      t.consume(code);
+      t.exit(tGfmFootnoteDefinitionLabelMarker);
+      t.next = labelAtMarker;
+    };
+  });
+  c.continuation = new Construct(C_NONE, (Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => t.checkOne(blankLine, ok, t.attemptOne(indent, ok, nok)));
+  c.hasExit = true;
+  c.exit = (Tokenizer t) => {
+    t.exit(tGfmFootnoteDefinition);
+  };
+  return c;
+}
+
+Construct call = new Construct(C_GFM_FOOTNOTE_CALL, (Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+  int size = 0;
+  bool data = false;
+  func(int)->void callData = noState;
+  func(int)->void callEscape = (int code) => {
+    if (code == 91 || code == 92 || code == 93) {
+      t.consume(code);
+      size++;
+      t.next = callData;
+      return;
+    }
+    callData(code);
+  };
+  callData = (int code) => {
+    if (size > LINK_REFERENCE_SIZE_MAX || (code == 93 && !data) || code == EOF || code == 91 || markdownLineEndingOrSpace(code)) {
+      nok(code);
+      return;
+    }
+    if (code == 93) {
+      t.exit(tChunkString);
+      int token = t.exit(tGfmFootnoteCallString);
+      if (!t.parser.defines(normalizeIdentifier(t.sliceSerialize(token, false)), ID_FOOTNOTE)) {
+        nok(code);
+        return;
+      }
+      t.enter(tGfmFootnoteCallLabelMarker);
+      t.consume(code);
+      t.exit(tGfmFootnoteCallLabelMarker);
+      t.exit(tGfmFootnoteCall);
+      t.next = ok;
+      return;
+    }
+    if (!markdownLineEndingOrSpace(code)) {
+      data = true;
+    }
+    size++;
+    t.consume(code);
+    t.next = if (code == 92) { callEscape } else { callData };
+  };
+  func(int)->void callStart = (int code) => {
+    if (code != 94) {
+      nok(code);
+      return;
+    }
+    t.enter(tGfmFootnoteCallMarker);
+    t.consume(code);
+    t.exit(tGfmFootnoteCallMarker);
+    t.enter(tGfmFootnoteCallString);
+    int chunk = t.enter(tChunkString);
+    t.tokens.contentType[chunk] = CT_STRING;
+    t.next = callData;
+  };
+  return (int code) => {
+    t.enter(tGfmFootnoteCall);
+    t.enter(tGfmFootnoteCallLabelMarker);
+    t.consume(code);
+    t.exit(tGfmFootnoteCallLabelMarker);
+    t.next = callStart;
+  };
+});
+
+int[] resolveToPotentialGfmFootnoteCall(int[] events, Tokenizer t) {
+  Tokens tokens = t.tokens;
+  int index = events.length;
+  while (index-- > 0) {
+    if (tokens.type[eventToken(events[index])] == tLabelImage && isEnter(events[index])) {
+      break;
+    }
+  }
+  tokens.type[eventToken(events[index + 1])] = tData;
+  int third = eventToken(events[index + 3]);
+  tokens.type[third] = tGfmFootnoteCallLabelMarker;
+  int callToken = newToken(t, tGfmFootnoteCall);
+  tokens.startAtStartOf(callToken, third);
+  tokens.endAtEndOf(callToken, eventToken(events[events.length - 1]));
+  int marker = newToken(t, tGfmFootnoteCallMarker);
+  tokens.startAtEndOf(marker, third);
+  tokens.endAtEndOf(marker, third);
+  tokens.eOffset[marker] += 1;
+  tokens.eIndex[marker] += 1;
+  int stringToken = newToken(t, tGfmFootnoteCallString);
+  tokens.sIndex[stringToken] = tokens.eIndex[marker];
+  tokens.sOffset[stringToken] = tokens.eOffset[marker];
+  tokens.endAtStartOf(stringToken, eventToken(events[events.length - 1]));
+  int chunk = newToken(t, tChunkString);
+  tokens.contentType[chunk] = CT_STRING;
+  tokens.startAtStartOf(chunk, stringToken);
+  tokens.endAtEndOf(chunk, stringToken);
+  int[] replacement = [
+    events[index + 1], events[index + 2], enterEvent(callToken), events[index + 3], events[index + 4],
+    enterEvent(marker), exitEvent(marker), enterEvent(stringToken), enterEvent(chunk), exitEvent(chunk), exitEvent(stringToken),
+    events[events.length - 2], events[events.length - 1], exitEvent(callToken)
+  ];
+  splice(events, index, events.length - index + 1, replacement);
+  return events;
+}
+
+Construct potentialCall = makePotentialCall();
+
+Construct makePotentialCall() {
+  Construct c = new Construct(C_GFM_POTENTIAL_FOOTNOTE_CALL, (Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+    Tokens tokens = t.tokens;
+    int index = t.events.length;
+    int labelStart = -1;
+    while (index-- > 0) {
+      int token = eventToken(t.events[index]);
+      int type = tokens.type[token];
+      if (type == tLabelImage) {
+        labelStart = token;
+        break;
+      }
+      if (type == tGfmFootnoteCall || type == tLabelLink || type == tLabel || type == tImage || type == tLink) {
+        break;
+      }
+    }
+    return (int code) => {
+      if (labelStart < 0 || !tokens.has(labelStart, F_BALANCED)) {
+        nok(code);
+        return;
+      }
+      string id = normalizeIdentifier(t.serialize(tokens.eIndex[labelStart], t.index, tokens.eOffset[labelStart], false));
+      if (id.length == 0 || id.codeUnitAt(0) != 94 || !t.parser.defines(id.slice(1), ID_FOOTNOTE)) {
+        nok(code);
+        return;
+      }
+      t.enter(tGfmFootnoteCallLabelMarker);
+      t.consume(code);
+      t.exit(tGfmFootnoteCallLabelMarker);
+      ok(code);
+    };
+  });
+  c.addAfter = true;
+  c.hasResolveTo = true;
+  c.resolveTo = resolveToPotentialGfmFootnoteCall;
+  return c;
+}
+
+export SyntaxExtension gfmFootnote() {
+  SyntaxExtension e = new SyntaxExtension();
+  e.add(HOOK_DOCUMENT, 91, [definition]);
+  e.add(HOOK_TEXT, 91, [call]);
+  e.add(HOOK_TEXT, 93, [potentialCall]);
+  return e;
+}

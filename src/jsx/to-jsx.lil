@@ -2,7 +2,7 @@
 // React's functions and components are host values; everything before them is typed. Tags and properties
 // are ints: a name is read from its table only where React needs it (the element type, a prop key).
 
-import { H_ELEMENT, H_ROOT, H_TEXT, P_BOOLEAN, P_KEYWORD, P_NUMBER, P_STRING, PROP_ALIGN, TAG_SVG, TAG_TABLE, TAG_TBODY, TAG_TD, TAG_TH, TAG_THEAD, TAG_TR, Hast, keywordNames, propNames, tagNames } from "./to-hast/hast.lil";
+import { H_ELEMENT, H_ROOT, H_TEXT, P_BOOLEAN, P_KEYWORD, P_NUMBER, P_STRING, PROP_ALIGN, TAG_SVG, TAG_TABLE, TAG_TBODY, TAG_TD, TAG_TH, TAG_THEAD, TAG_TR, Hast, keywordNames, propNames, tagNames } from "../hast/hast.lil";
 import { commaSeparated, commaSeparatedSvg, reactKeys, reactKeysSvg } from "./properties.lil";
 
 export class JsxOptions {

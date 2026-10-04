@@ -1,0 +1,20 @@
+// remark-gfm 4.0.1 for the lil2 pipeline, as typed parts that higher layers compile in: the syntax
+// (micromark-extension-gfm) and the mdast handlers (mdast-util-gfm). mdast-util-to-hast already handles
+// GFM nodes by default, as upstream does.
+
+import { SyntaxExtension } from "../micromark/parse.lil";
+import { FromMarkdown } from "../mdast/from-markdown.lil";
+import { gfmAutolinkLiteral } from "./syntax/autolink-literal.lil";
+import { gfmFootnote } from "./syntax/footnote.lil";
+import { gfmStrikethrough } from "./syntax/strikethrough.lil";
+import { gfmTable } from "./syntax/table.lil";
+import { gfmTaskListItem } from "./syntax/task-list-item.lil";
+import { installGfmFromMarkdown } from "./mdast-gfm.lil";
+
+// micromark-extension-gfm, in upstream's order. Upstream's `singleTilde` defaults to true.
+export SyntaxExtension[] gfmSyntax(bool singleTilde) {
+  return [gfmAutolinkLiteral(), gfmFootnote(), gfmStrikethrough(singleTilde), gfmTable(), gfmTaskListItem()];
+}
+
+// mdast-util-gfm's from-markdown handlers.
+export func(FromMarkdown)->void gfmMdast = (FromMarkdown c) => installGfmFromMarkdown(c);

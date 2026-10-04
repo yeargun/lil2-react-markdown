@@ -1,0 +1,103 @@
+// micromark-extension-gfm-strikethrough 2.1.0.
+
+import { EOF, GROUP_PUNCTUATION, classifyCharacter } from "../../micromark/codes.lil";
+import { tCharacterEscape, tData } from "../../micromark/types.lil";
+import { F_CLOSE, F_OPEN, Construct, Tokenizer, Tokens, defineResolver, enterEvent, eventToken, exitEvent, isEnter, newToken, noState, resolveAllOf, splice } from "../../micromark/tokenizer.lil";
+import { HOOK_TEXT, SyntaxExtension } from "../../micromark/parse.lil";
+import { C_STRIKETHROUGH, tStrikethrough, tStrikethroughSequence, tStrikethroughSequenceTemporary, tStrikethroughText } from "./ids.lil";
+
+
+int size(Tokens tokens, int token) {
+  return tokens.eOffset[token] - tokens.sOffset[token];
+}
+
+int[] resolveAllStrikethrough(int[] events, Tokenizer t) {
+  Tokens tokens = t.tokens;
+  int index = -1;
+  while (++index < events.length) {
+    int closer = eventToken(events[index]);
+    if (isEnter(events[index]) && tokens.type[closer] == tStrikethroughSequenceTemporary && tokens.has(closer, F_CLOSE)) {
+      int open = index;
+      while (open-- > 0) {
+        int opener = eventToken(events[open]);
+        if (!isEnter(events[open]) && tokens.type[opener] == tStrikethroughSequenceTemporary && tokens.has(opener, F_OPEN) && size(tokens, closer) == size(tokens, opener)) {
+          tokens.type[closer] = tStrikethroughSequence;
+          tokens.type[opener] = tStrikethroughSequence;
+          int strikethrough = newToken(t, tStrikethrough);
+          tokens.startAtStartOf(strikethrough, opener);
+          tokens.endAtEndOf(strikethrough, closer);
+          int text = newToken(t, tStrikethroughText);
+          tokens.startAtEndOf(text, opener);
+          tokens.endAtStartOf(text, closer);
+          int[] nextEvents = [enterEvent(strikethrough), enterEvent(opener), exitEvent(opener), enterEvent(text)];
+          int[] inside = resolveAllOf(t.parser.constructs.insideSpan, events.slice(open + 1, index), t);
+          splice(nextEvents, nextEvents.length, 0, inside);
+          splice(nextEvents, nextEvents.length, 0, [exitEvent(text), enterEvent(closer), exitEvent(closer), exitEvent(strikethrough)]);
+          splice(events, open - 1, index - open + 3, nextEvents);
+          index = open + nextEvents.length - 2;
+          break;
+        }
+      }
+    }
+  }
+  index = -1;
+  while (++index < events.length) {
+    int token = eventToken(events[index]);
+    if (tokens.type[token] == tStrikethroughSequenceTemporary) {
+      tokens.type[token] = tData;
+    }
+  }
+  return events;
+}
+
+int strikethroughResolver = defineResolver(resolveAllStrikethrough);
+
+// `gfmStrikethrough({singleTilde})`.
+export SyntaxExtension gfmStrikethrough(bool singleTilde) {
+  Construct tokenizer = new Construct(C_STRIKETHROUGH, (Tokenizer t, bool interrupt, func(int)->void ok, func(int)->void nok) => {
+    int previous = t.previous;
+    int[] events = t.events;
+    int count = 0;
+    func(int)->void more = noState;
+    more = (int code) => {
+      int before = classifyCharacter(previous);
+      if (code == 126) {
+        if (count > 1) {
+          nok(code);
+          return;
+        }
+        t.consume(code);
+        count++;
+        t.next = more;
+        return;
+      }
+      if (count < 2 && !singleTilde) {
+        nok(code);
+        return;
+      }
+      int token = t.exit(tStrikethroughSequenceTemporary);
+      int after = classifyCharacter(code);
+      if (after == 0 || (after == GROUP_PUNCTUATION && before != 0)) {
+        t.tokens.set(token, F_OPEN);
+      }
+      if (before == 0 || (before == GROUP_PUNCTUATION && after != 0)) {
+        t.tokens.set(token, F_CLOSE);
+      }
+      ok(code);
+    };
+    return (int code) => {
+      if (previous == 126 && t.tokens.type[eventToken(events[events.length - 1])] != tCharacterEscape) {
+        nok(code);
+        return;
+      }
+      t.enter(tStrikethroughSequenceTemporary);
+      more(code);
+    };
+  });
+  tokenizer.resolveAll = strikethroughResolver;
+  SyntaxExtension e = new SyntaxExtension();
+  e.add(HOOK_TEXT, 126, [tokenizer]);
+  e.insideSpan = [tokenizer];
+  e.attentionMarkers = [126];
+  return e;
+}

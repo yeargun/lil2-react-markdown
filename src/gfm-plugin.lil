@@ -1,0 +1,16 @@
+// The GFM plugin (remark-gfm 4.0.1), registered when this module loads. Its option is the Markdown prop
+// `singleTilde` (default true).
+
+import { SyntaxExtension } from "./micromark/parse.lil";
+import { PLUGIN_GFM, Pipeline, register } from "./plugins.lil";
+import { gfmMdast, gfmSyntax } from "./gfm/gfm.lil";
+
+void installGfm(Pipeline p) {
+  JsValue singleTilde = p.options["singleTilde"];
+  for (SyntaxExtension extension of gfmSyntax(JS.isUndefined(singleTilde) || bool(singleTilde))) {
+    p.syntax.push(extension);
+  }
+  p.mdast.push(gfmMdast);
+}
+
+export bool gfmRegistered = register(PLUGIN_GFM, installGfm);
