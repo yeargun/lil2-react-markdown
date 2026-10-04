@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta content="lil2-react-markdown: react-markdown@10.1.0 rewritten in typed LilScript on the flat lil2 stack — raw, gzip and Brotli objective builds against minified upstream, speed in Chromium and Firefox, a live lab." name="description"/>
+<meta content="#c9a227" name="theme-color"/>
+<title>lil2-react-markdown — react-markdown@10.1.0, typed and flat</title>
+<link href="./styles.css" rel="stylesheet"/>
+<link href="./objective-comparison.css" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" rel="stylesheet"/>
+<script src="./app.js" type="module"></script>
+</head>
+<body>
+<div aria-hidden="true" class="progress"></div>
+<header class="nav shell">
+<a aria-label="lil2-react-markdown home" class="wordmark" href="#top"><span class="mark">rm</span><span>lil2-react-markdown</span></a>
+<nav aria-label="Main navigation">
+<a href="#stack">stack</a>
+<a href="#lab">playground</a>
+<a href="#evidence">size</a>
+<a href="#speed">speed</a>
+<a href="#compiler">build time</a>
+<a href="https://github.com/yeargun/lil2-react-markdown">GitHub ↗</a>
+</nav>
+</header>
+<main id="top">
+<section class="hero shell">
+<div class="hero-copy">
+<p class="eyebrow"><span class="live-dot"></span> react-markdown@10.1.0 · lil2 family · @itslil/lil2-react-markdown</p>
+<h1>react-markdown,<br/><em>flat.</em></h1>
+<p class="lede">react-markdown on the whole flat stack: one LilScript program from characters to React elements. Components get node ids into the hast columns; tags, properties and plugins are int ids.</p>
+<div class="install-row"><code>npm install @itslil/lil2-react-markdown katex</code><button class="copy" data-copy="npm install @itslil/lil2-react-markdown katex" type="button">copy</button></div>
+<div class="hero-actions">
+<a class="button primary" href="#lab">Playground</a>
+<a class="button secondary" href="https://github.com/yeargun/lil2-react-markdown">GitHub ↗</a>
+</div>
+</div>
+<div aria-label="Size and speed" class="scoreboard">
+<div class="score-main">
+<span class="score-label" id="hero-label">lil2 browser build versus minified upstream · Brotli-11</span>
+<strong id="hero-ratio">37.9%<span>smaller</span></strong>
+<p id="hero-bytes">31,169 B upstream (Terser) → 19,341 B lil2</p>
+</div>
+<div class="score-grid">
+<div><strong id="hero-gzip">36.5% smaller</strong><span>gzip-9 objective build</span></div>
+<div><strong id="hero-raw">44.4% smaller</strong><span>raw objective build</span></div>
+<div><strong>0.42× the time</strong><span>of upstream’s per call, Chromium 151.0.7922.34 (geometric mean)</span></div>
+<div><strong>3/3</strong><span>size cells smaller</span></div>
+</div>
+<p class="score-note">Raw, gzip and Brotli each use a separate LilScript compilation targeting that objective; upstream is the smallest of Terser, esbuild and Oxc on the same API bundled for the browser.</p>
+</div>
+</section>
+<section aria-label="The family" class="ticker">
+<div>lil2-micromark <span>✦</span> lil2-mdast-util-from-markdown <span>✦</span> lil2-mdast-util-to-hast <span>✦</span> lil2-remark-gfm <span>✦</span> lil2-remark-math <span>✦</span> lil2-rehype-katex <span>✦</span> lil2-remark-breaks <span>✦</span> lil2-react-markdown <span>✦</span> lil2-react-markdown + gfm <span>✦</span> lil2-react-markdown + gfm, math, KaTeX, breaks <span>✦</span> lil2-micromark <span>✦</span> lil2-mdast-util-from-markdown <span>✦</span> lil2-mdast-util-to-hast <span>✦</span> lil2-remark-gfm <span>✦</span> lil2-remark-math <span>✦</span> lil2-rehype-katex <span>✦</span> lil2-remark-breaks <span>✦</span> lil2-react-markdown <span>✦</span> lil2-react-markdown + gfm <span>✦</span> lil2-react-markdown + gfm, math, KaTeX, breaks</div>
+</section>
+<section class="shell compare" id="stack">
+<div class="section-heading">
+<div>
+<p class="eyebrow">The lil2 family</p>
+<h2>This package,<br/>then the stack.</h2>
+</div>
+<p>Every layer of the react-markdown stack, rewritten bottom to top with ints for every id and enum and flat
+arrays for every tree. Each tab is one package: its size against minified upstream for each objective, its speed
+in real browsers, and the checks that its output equals upstream’s.</p>
+</div>
+<div aria-label="Packages" class="stack-tabs" id="stack-tabs" role="tablist"><button type="button" role="tab" data-id="react-markdown" aria-selected="true">react-markdown</button><button type="button" role="tab" data-id="react-markdown-gfm" aria-selected="false">react-markdown + gfm</button><button type="button" role="tab" data-id="react-markdown-full" aria-selected="false">react-markdown + gfm, math, KaTeX, breaks</button><button type="button" role="tab" data-id="micromark" aria-selected="false">micromark</button><button type="button" role="tab" data-id="from-markdown" aria-selected="false">mdast-util-from-markdown</button><button type="button" role="tab" data-id="to-hast" aria-selected="false">mdast-util-to-hast</button><button type="button" role="tab" data-id="gfm" aria-selected="false">remark-gfm</button><button type="button" role="tab" data-id="math" aria-selected="false">remark-math</button><button type="button" role="tab" data-id="katex" aria-selected="false">rehype-katex</button><button type="button" role="tab" data-id="breaks" aria-selected="false">remark-breaks</button></div>
+<div id="stack-detail"><div class="stack-card" style="margin-top:56px">
+    <div>
+      <h3>lil2-react-markdown</h3>
+      <p>react-markdown on the whole flat stack: one LilScript program from characters to React elements. Components get node ids into the hast columns; tags, properties and plugins are int ids.</p>
+      <div class="stack-meta"><a href="https://github.com/yeargun/lil2-react-markdown">GitHub ↗</a><a href="https://yeargun.github.io/lil2-react-markdown/">page ↗</a><a href="./family/react-markdown/comparison.json">comparison.json ↗</a></div>
+    </div>
+    <div class="stack-detail-grid">
+      <span>Rewrites</span><code>react-markdown@10.1.0</code>
+      <span>API</span><code>&lt;Markdown plugins={[GFM, MATH, KATEX]} components={[TAG_H1, H1]}&gt;{markdown}&lt;/Markdown&gt;</code>
+      <span>Behaviour</span><strong class="good">Same rendered HTML as react-markdown on 736 documents under nine option sets; the gfm flavor equals react-markdown + remark-gfm on 1,453 documents under seven; the full flavor equals react-markdown + remark-gfm + remark-math + rehype-katex + remark-breaks under eight.</strong>
+      <span>Cells</span><strong>3 of 3 smaller</strong>
+    </div>
+  </div></div>
+</section>
+<section class="lab shell" id="lab">
+<div class="section-heading">
+<div>
+<p class="eyebrow">Both builds, in this page</p>
+<h2>Live<br/>lab.</h2>
+</div>
+<p>Left is markdown. Right is <code>lil2-react-markdown/full</code> rendering it as you type. <strong>Race</strong> times
+react-markdown with remark-gfm, remark-math and rehype-katex against lil2 on the current text, both loaded here.</p>
+</div>
+<div class="playground">
+<div class="play-toolbar">
+<label><input type="checkbox" data-plugin="gfm" checked/> GFM</label>
+<label><input type="checkbox" data-plugin="math" checked/> math</label>
+<label><input type="checkbox" data-plugin="katex" checked/> KaTeX</label>
+<label><input type="checkbox" data-plugin="breaks"/> breaks</label>
+<span id="render-ms"></span>
+<button id="race" type="button">Race react-markdown</button>
+<span id="race-out"></span>
+</div>
+<div class="samples"><button type="button" data-sample="chat">chat</button><button type="button" data-sample="gfm">GFM</button><button type="button" data-sample="math">math</button><button type="button" data-sample="readme">readme</button></div>
+<div class="play-grid" id="lab-root">
+<textarea id="lab-input" spellcheck="false" aria-label="Markdown"># Notes on Fourier analysis
+
+The Fourier transform of an integrable function $f$ is
+$\hat f(\xi) = \int_{-\infty}^{\infty} f(x)\, e^{-2\pi i x \xi}\, dx$, and when
+$\hat f$ is integrable too the inversion formula holds:
+
+$$
+f(x) = \int_{-\infty}^{\infty} \hat f(\xi)\, e^{2\pi i x \xi}\, d\xi .
+$$
+
+## Plancherel
+
+For $f \in L^1 \cap L^2$ we have $\|f\|_2 = \|\hat f\|_2$, so the transform
+extends to a unitary map on $L^2(\mathbb{R})$.
+
+$$
+\int_{\mathbb{R}} |f(x)|^2 \, dx = \int_{\mathbb{R}} |\hat f(\xi)|^2 \, d\xi
+$$
+
+## Convolution
+
+If $h = f * g$ with $(f * g)(x) = \int f(y) g(x - y)\, dy$, then
+$\hat h = \hat f \cdot \hat g$. The Gaussian $g(x) = e^{-\pi x^2}$ is its own
+transform, $\hat g = g$.
+
+| Function | Transform |
+| --- | --- |
+| $e^{-\pi x^2}$ | $e^{-\pi \xi^2}$ |
+| $\mathbf{1}_{[-1/2, 1/2]}(x)$ | $\operatorname{sinc}(\xi) = \frac{\sin \pi \xi}{\pi \xi}$ |
+| $f(x - a)$ | $e^{-2\pi i a \xi} \hat f(\xi)$ |
+| $f'(x)$ | $2\pi i \xi\, \hat f(\xi)$ |
+
+## Poisson summation
+
+For a Schwartz function $f$:
+
+$$
+\sum_{n \in \mathbb{Z}} f(n) = \sum_{k \in \mathbb{Z}} \hat f(k)
+$$
+
+Applied to $f(x) = e^{-\pi t x^2}$ this gives the theta identity
+$\theta(t) = t^{-1/2}\, \theta(1/t)$ where $\theta(t) = \sum_n e^{-\pi n^2 t}$.
+
+## A matrix
+
+$$
+\begin{pmatrix} a &amp; b \\ c &amp; d \end{pmatrix}^{-1}
+= \frac{1}{ad - bc} \begin{pmatrix} d &amp; -b \\ -c &amp; a \end{pmatrix},
+\qquad ad - bc \neq 0 .
+$$
+
+- [x] inversion
+- [x] Plancherel
+- [ ] uncertainty principle: $\Delta x\, \Delta \xi \ge \frac{1}{4\pi}$
+</textarea>
+<div class="play-preview" id="lab-output"></div>
+</div>
+<p class="lab-note">The output is rendered by the shipped browser build; the race runs each side for 400 ms after a warm-up.</p>
+</div>
+</section>
+<section class="objective-section shell" id="evidence"><p class="eyebrow">Browser build · minified upstream</p><h2>Three objectives.<br/>Measured separately.</h2><div id="compression-comparison"><div class="objective-cards"><article class="objective-card"><span>Raw</span><strong>65,669 B</strong><p>44.4% smaller than original</p><small>Terser · 118,031 B</small></article><article class="objective-card"><span>gzip-9</span><strong>22,230 B</strong><p>36.5% smaller than original</p><small>Terser · 35,017 B</small></article><article class="objective-card"><span>Brotli-11</span><strong>19,341 B</strong><p>37.9% smaller than original</p><small>Terser · 31,169 B</small></article></div>
+    <div class="table-wrap objective-table"><table><caption>Current LilScript versus minified original</caption><thead><tr><th>Compiler objective</th><th>LilScript</th><th>Original minified</th><th>Original minifier</th><th>Difference</th></tr></thead><tbody><tr data-objective="raw"><th scope="row">Raw</th><td><a href="./family/react-markdown/files/lil2/raw/react-markdown.js">65,669 B</a></td><td><a href="./family/react-markdown/files/upstream/Terser.mjs">118,031 B</a></td><td>Terser</td><td>44.4% smaller</td></tr><tr data-objective="gzip"><th scope="row">gzip-9</th><td><a href="./family/react-markdown/files/lil2/gzip/react-markdown.js">22,230 B</a></td><td><a href="./family/react-markdown/files/upstream/Terser.mjs">35,017 B</a></td><td>Terser</td><td>36.5% smaller</td></tr><tr data-objective="brotli"><th scope="row">Brotli-11</th><td><a href="./family/react-markdown/files/lil2/brotli/react-markdown.js">19,341 B</a></td><td><a href="./family/react-markdown/files/upstream/Terser.mjs">31,169 B</a></td><td>Terser</td><td>37.9% smaller</td></tr></tbody></table></div>
+    <p class="objective-note">Each LilScript row comes from a separate compilation targeting that row’s objective. Raw is uncompressed JavaScript; gzip uses level 9; Brotli uses quality 11 and window 22. For each metric, the original is the smallest result among the minifiers below. No JavaScript minifier runs after LilScript.</p>
+    <details class="objective-details"><summary>Every artifact, measured with all three codecs</summary><div class="table-wrap objective-table"><table><thead><tr><th>Artifact</th><th>Raw</th><th>gzip-9</th><th>Brotli-11</th></tr></thead><tbody><tr><th><a href="./family/react-markdown/files/lil2/raw/react-markdown.js">LilScript · Raw objective</a></th><td>65,669 B</td><td>23,535 B</td><td>20,380 B</td></tr><tr><th><a href="./family/react-markdown/files/lil2/gzip/react-markdown.js">LilScript · gzip-9 objective</a></th><td>67,335 B</td><td>22,230 B</td><td>19,363 B</td></tr><tr><th><a href="./family/react-markdown/files/lil2/brotli/react-markdown.js">LilScript · Brotli-11 objective</a></th><td>67,480 B</td><td>22,255 B</td><td>19,341 B</td></tr><tr><th><a href="./family/react-markdown/files/upstream/Terser.mjs">Original · Terser 5.51.2</a></th><td>118,031 B</td><td>35,017 B</td><td>31,169 B</td></tr><tr><th><a href="./family/react-markdown/files/upstream/esbuild.mjs">Original · esbuild 0.28.1</a></th><td>120,485 B</td><td>37,000 B</td><td>33,090 B</td></tr><tr><th><a href="./family/react-markdown/files/upstream/Oxc.mjs">Original · Oxc vite 8.2.1</a></th><td>118,061 B</td><td>35,463 B</td><td>31,702 B</td></tr></tbody></table></div></details>
+    <p class="objective-note">Browser builds on both sides: lil2’s `browser` condition and upstream bundled by esbuild 0.28.1 with the browser condition (`export {default as Markdown, defaultUrlTransform} from &#39;react-markdown&#39;`). Upstream: <strong>react-markdown@10.1.0</strong>. External dependencies excluded from sizes: react, react/jsx-runtime. CSS, fonts, type declarations and source maps are outside these JavaScript sizes.</p>
+    
+    <p class="objective-note"><a href="./family/react-markdown/comparison.json">Measurements, hashes and settings ↗</a> · <a href="./family/react-markdown/comparison-builds.json">Commands and build receipts ↗</a></p></div></section>
+<section class="objective-section shell" id="speed"><p class="eyebrow">Real browsers · identical output first</p><h2>Speed.</h2><div id="speed-root"><div class="table-wrap objective-table"><table><caption>Chromium 151.0.7922.34  · median per call, identical output checked first</caption><thead><tr><th>Document</th><th>Upstream</th><th>lil2</th><th>Time</th></tr></thead><tbody><tr><th scope="row">chat</th><td>0.817 ms</td><td>0.313 ms</td><td class="verdict win"><strong>0.38×</strong></td></tr><tr><th scope="row">readme</th><td>16.300 ms</td><td>7.800 ms</td><td class="verdict win"><strong>0.48×</strong></td></tr><tr><th scope="row">large</th><td>179.900 ms</td><td>70.200 ms</td><td class="verdict win"><strong>0.39×</strong></td></tr><tr><th scope="row">gfm</th><td>15.650 ms</td><td>5.500 ms</td><td class="verdict win"><strong>0.35×</strong></td></tr><tr><th scope="row">math</th><td>17.750 ms</td><td>9.800 ms</td><td class="verdict win"><strong>0.55×</strong></td></tr><tr><th scope="row">load (import)</th><td>9.8 ms</td><td>5.4 ms</td><td class="verdict win"><strong>0.55×</strong></td></tr><tr><th scope="row">first call, cold</th><td>19.9 ms</td><td>15.8 ms</td><td class="verdict win"><strong>0.79×</strong></td></tr></tbody></table></div><div class="table-wrap objective-table"><table><caption>Firefox 153.0  · median per call, identical output checked first</caption><thead><tr><th>Document</th><th>Upstream</th><th>lil2</th><th>Time</th></tr></thead><tbody><tr><th scope="row">chat</th><td>1.571 ms</td><td>0.667 ms</td><td class="verdict win"><strong>0.42×</strong></td></tr><tr><th scope="row">readme</th><td>34.000 ms</td><td>14.000 ms</td><td class="verdict win"><strong>0.41×</strong></td></tr><tr><th scope="row">large</th><td>410.000 ms</td><td>136.000 ms</td><td class="verdict win"><strong>0.33×</strong></td></tr><tr><th scope="row">gfm</th><td>26.000 ms</td><td>11.000 ms</td><td class="verdict win"><strong>0.42×</strong></td></tr><tr><th scope="row">math</th><td>21.000 ms</td><td>15.000 ms</td><td class="verdict win"><strong>0.71×</strong></td></tr><tr><th scope="row">load (import)</th><td>18.0 ms</td><td>12.0 ms</td><td class="verdict win"><strong>0.67×</strong></td></tr><tr><th scope="row">first call, cold</th><td>15.0 ms</td><td>14.0 ms</td><td class="verdict win"><strong>0.93×</strong></td></tr></tbody></table></div><p class="objective-note">Playwright, one fresh browser context per lane; lanes interleave and alternate order every round. Upstream is the same API bundled from npm for the browser; lil2 is the shipped browser build. Load is the module import after the file is fetched; first call is the first document, cold.</p></div></section>
+<section class="objective-section shell" id="compiler"><p class="eyebrow">Same machine · sequential builds</p><h2>Build time.</h2><div id="objective-build-times"><div class="table-wrap objective-table"><table><caption>Build wall time on the same machine</caption><thead><tr><th>Output objective</th><th>LilScript compilation</th><th>Original bundling + minification</th><th>Original minifier</th></tr></thead><tbody><tr><th scope="row">Raw</th><td>33.75 s</td><td>1.27 s</td><td>Terser</td></tr><tr><th scope="row">gzip-9</th><td>33.75 s</td><td>1.27 s</td><td>Terser</td></tr><tr><th scope="row">Brotli-11</th><td>11.27 s</td><td>1.27 s</td><td>Terser</td></tr></tbody></table></div>
+    <p class="objective-note">One fresh output build per objective and minifier, run sequentially. LilScript compilation includes optimization and objective scoring with persistent caches disabled and one worker. Original time includes Node startup, esbuild bundling of installed upstream ESM, and the named minifier. It excludes building the upstream package from its original TypeScript sources. Dependency installation, tests and final file compression are excluded on both sides. These are observations on a shared machine, not a build-speed guarantee.</p>
+    <p class="objective-note">AMD EPYC 7763 64-Core Processor · 8 logical CPUs · 15.6 GiB RAM · Linux 7.0.0-1014-azure · Node v20.19.0. Measured 2026-10-04. <a href="./family/react-markdown/comparison-builds.json">Exact commands and compiler identity ↗</a></p></div></section>
+<section class="closing shell">
+<p class="eyebrow">Install</p>
+<h2>Typed, flat,<br/>same output.</h2>
+<div class="install-row large"><code>npm install @itslil/lil2-react-markdown katex</code><button class="copy" data-copy="npm install @itslil/lil2-react-markdown katex" type="button">copy</button></div>
+</section>
+</main>
+<footer class="shell">
+<span>@itslil/lil2-react-markdown · MIT</span>
+<span>react-markdown@10.1.0, rewritten in LilScript</span>
+<a href="https://github.com/yeargun/lil2-react-markdown">source ↗</a>
+</footer>
+</body>
+</html>

@@ -1,0 +1,5 @@
+{
+ "label": "render to HTML with GFM, math and KaTeX",
+ "upstream": "./lab/upstream-run.mjs",
+ "lil2": "./lab/lil2-run.mjs"
+}
