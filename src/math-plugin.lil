@@ -2,6 +2,7 @@
 // prop `singleDollarTextMath`, default true), rehype-katex 7.0.1 (option: the Markdown prop `katex`, KaTeX's
 // options) and remark-breaks 4.0.0.
 
+import { SyntaxExtension } from "./micromark/parse.lil";
 import { PLUGIN_BREAKS, PLUGIN_KATEX, PLUGIN_MATH, Pipeline, register } from "./plugins.lil";
 import { newlineToBreak } from "./breaks/breaks.lil";
 import { mathHast, mathMdast, mathSyntax } from "./math/math.lil";
@@ -9,9 +10,18 @@ import { rehypeKatex } from "./katex/rehype-katex.lil";
 import { Hast } from "./hast/hast.lil";
 import { parseStyle } from "./jsx/style.lil";
 
+// The syntax for each `singleDollarTextMath`, made on first use and kept (see gfm-plugin.lil).
+SyntaxExtension[] withSingleDollar = [];
+SyntaxExtension[] withoutSingleDollar = [];
+
 void installMath(Pipeline p) {
   JsValue single = p.options["singleDollarTextMath"];
-  p.syntax.push(mathSyntax(JS.isNullish(single) || bool(single)));
+  bool singleDollar = JS.isNullish(single) || bool(single);
+  SyntaxExtension[] kept = if (singleDollar) { withSingleDollar } else { withoutSingleDollar };
+  if (kept.length == 0) {
+    kept.push(mathSyntax(singleDollar));
+  }
+  p.syntax.push(kept[0]);
   p.mdast.push(mathMdast);
   p.hast.push(mathHast);
 }

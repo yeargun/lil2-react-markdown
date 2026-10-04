@@ -5,9 +5,21 @@ import { SyntaxExtension } from "./micromark/parse.lil";
 import { PLUGIN_GFM, Pipeline, register } from "./plugins.lil";
 import { gfmMdast, gfmSyntax } from "./gfm/gfm.lil";
 
+// The syntax for each `singleTilde`, made on first use and kept: the same objects every render let the parser
+// reuse its combined constructs.
+SyntaxExtension[] withSingleTilde = [];
+SyntaxExtension[] withoutSingleTilde = [];
+
 void installGfm(Pipeline p) {
   JsValue singleTilde = p.options["singleTilde"];
-  for (SyntaxExtension extension of gfmSyntax(JS.isUndefined(singleTilde) || bool(singleTilde))) {
+  bool single = JS.isUndefined(singleTilde) || bool(singleTilde);
+  SyntaxExtension[] kept = if (single) { withSingleTilde } else { withoutSingleTilde };
+  if (kept.length == 0) {
+    for (SyntaxExtension extension of gfmSyntax(single)) {
+      kept.push(extension);
+    }
+  }
+  for (SyntaxExtension extension of kept) {
     p.syntax.push(extension);
   }
   p.mdast.push(gfmMdast);
