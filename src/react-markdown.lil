@@ -1,16 +1,17 @@
 // react-markdown 10.1.0: markdown to React elements. The pipeline (micromark, mdast, hast) is typed and
-// flat; React, the components map and user callbacks are the only host values.
+// flat; React, components and user callbacks are the only host values. Tags and properties are int ids
+// (`TAG_*`, `PROP_*`, exported by the `constants` entry): `components` are `[tag, component, ...]` pairs,
+// `allowedElements` and `disallowedElements` are tag ids, and `urlTransform` gets a property id.
 
 import extern {Fragment, jsx, jsxs} from "react/jsx-runtime";
 extern JsValue Fragment;
 extern JsValue jsx;
 extern JsValue jsxs;
-extern JsValue Object;
 
 import { fromMarkdownTree } from "./jsx/to-hast/mdast/index.lil";
 import { ToHast, installCommonmark, installGfm, toHast } from "./jsx/to-hast/to-hast.lil";
-import { H_ELEMENT, H_RAW, H_TEXT, HN_HAS_POSITION, P_BOOLEAN, P_LIST, P_NUMBER, Hast } from "./jsx/to-hast/hast.lil";
-import { JsxOptions, hastColumns, toJsxRuntime } from "./jsx/to-jsx.lil";
+import { H_ELEMENT, H_RAW, H_TEXT, HN_HAS_POSITION, P_NUMBER, PROP_HREF, PROP_SRC, TAG_A, TAG_IMG, TAG_INPUT, Hast, tagNames } from "./jsx/to-hast/hast.lil";
+import { JsxOptions, componentTable, hastColumns, toJsxRuntime } from "./jsx/to-jsx.lil";
 
 Regex safeProtocol = new Regex("^(https?|ircs?|mailto|xmpp)$", "i");
 
@@ -27,19 +28,41 @@ export string defaultUrlTransform(string value) {
   return "";
 }
 
-// html-url-attributes: property -> the tag names it is a URL on ("*" for every tag).
-string[] urlProperties = ["action", "cite", "data", "formAction", "href", "icon", "itemId", "manifest", "ping", "poster", "src"];
-string[] urlTags = ["form", "blockquote del ins q", "object", "button input", "a area base link", "menuitem", "*", "html", "a area", "video", "audio embed iframe img input script source track video"];
+// html-url-attributes, over the properties the pipeline creates: `href` is a URL on a, area, base and
+// link, `src` on audio, embed, iframe, img, input, script, source, track and video. Of those tags the
+// pipeline creates a, img and input. (Upstream visits `href` before `src`; so does `visitChildren`.)
+bool isUrl(int prop, int tag) {
+  if (prop == PROP_HREF) {
+    return tag == TAG_A;
+  }
+  return prop == PROP_SRC && (tag == TAG_IMG || tag == TAG_INPUT);
+}
 
-bool urlTagMatches(string tags, string tagName) {
-  return tags == "*" || (" " + tags + " ").includes(" " + tagName + " ");
+int[] urlProperties = [PROP_HREF, PROP_SRC];
+
+// Tag ids from a host array (`allowedElements`, `disallowedElements`) as a set by tag id.
+bool[] tagSet(JsValue tags) {
+  bool[] set = [];
+  for (int tag = 0; tag < tagNames.length; tag++) {
+    set.push(false);
+  }
+  int length = JS.number(tags["length"]).toInt();
+  for (int index = 0; index < length; index++) {
+    int tag = JS.number(tags[index]).toInt();
+    if (tag >= 0 && tag < set.length) {
+      set[tag] = true;
+    }
+  }
+  return set;
 }
 
 class Post {
   Hast h;
   JsValue options;
-  JsValue allowedElements;
-  JsValue disallowedElements;
+  // By tag id: whether `allowedElements` / `disallowedElements` remove it (and for tags past the set).
+  bool filter;
+  bool[] removed;
+  bool removedPast;
   JsValue allowElement;
   JsValue urlTransform;
   bool skipHtml;
@@ -50,8 +73,16 @@ class Post {
   init(Hast h, JsValue options) {
     this.h = h;
     this.options = options;
-    this.allowedElements = options["allowedElements"];
-    this.disallowedElements = options["disallowedElements"];
+    JsValue allowed = options["allowedElements"];
+    JsValue disallowed = options["disallowedElements"];
+    this.filter = bool(allowed) || bool(disallowed);
+    this.removed = [];
+    this.removedPast = bool(allowed);
+    if (bool(allowed)) {
+      this.removed = tagSet(allowed).map((bool kept) => !kept);
+    } else if (bool(disallowed)) {
+      this.removed = tagSet(disallowed);
+    }
     this.allowElement = options["allowElement"];
     this.urlTransform = options["urlTransform"];
     this.skipHtml = bool(options["skipHtml"]);
@@ -134,24 +165,20 @@ void visitChildren(Post post, int parent) {
       continue;
     }
     if (kind == H_ELEMENT) {
-      string tagName = h.tagName[child];
-      for (int at = 0; at < urlProperties.length; at++) {
-        int prop = h.findProperty(child, urlProperties[at]);
-        if (prop >= 0 && urlTagMatches(urlTags[at], tagName)) {
+      int tag = h.tag[child];
+      for (int name of urlProperties) {
+        int prop = h.findProperty(child, name);
+        if (prop >= 0 && isUrl(name, tag)) {
           string value = if (h.pKind[prop] == P_NUMBER) { "" + h.pNum[prop] } else { h.pStr[prop] };
           string next = if (bool(post.urlTransform)) {
-            JS.assume(JS.call(post.urlTransform, JS.undefined(), value, urlProperties[at], child, post.tree()))
+            JS.assume(JS.call(post.urlTransform, JS.undefined(), value, name, child, post.tree()))
           } else {
             defaultUrlTransform(value)
           };
-          h.setString(child, urlProperties[at], next);
+          h.setString(child, name, next);
         }
       }
-      bool remove = if (bool(post.allowedElements)) {
-        !bool(JS.invoke(post.allowedElements, "includes", tagName))
-      } else {
-        bool(post.disallowedElements) && bool(JS.invoke(post.disallowedElements, "includes", tagName))
-      };
+      bool remove = post.filter && (if (tag < post.removed.length) { post.removed[tag] } else { post.removedPast });
       if (!remove && bool(post.allowElement)) {
         remove = !bool(JS.call(post.allowElement, JS.undefined(), child, index, parent, post.tree()));
       }
@@ -167,7 +194,7 @@ void visitChildren(Post post, int parent) {
 }
 
 // `<Markdown {...options} />`: react-markdown's props. Callbacks and custom components get nodes as ids into
-// `tree`, the hast columns (see `hastColumns`): `urlTransform(url, key, node, tree)`,
+// `tree`, the hast columns (see `hastColumns`): `urlTransform(url, prop, node, tree)`,
 // `allowElement(node, index, parent, tree)`, and `props.node` / `props.tree` for components.
 export JsValue Markdown(JsValue options) {
   JsValue children = options["children"];
@@ -177,7 +204,7 @@ export JsValue Markdown(JsValue options) {
   installGfm(state);
   int root = toHast(state);
   visitChildren(new Post(state.hast, options), root);
-  JsxOptions jsxOptions = new JsxOptions(Fragment, jsx, jsxs, options["components"]);
+  JsxOptions jsxOptions = new JsxOptions(Fragment, jsx, jsxs, componentTable(options["components"]));
   jsxOptions.passNode = true;
   return toJsxRuntime(state.hast, root, jsxOptions);
 }

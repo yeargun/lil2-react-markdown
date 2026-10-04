@@ -6,10 +6,12 @@ import {jsx} from 'react/jsx-runtime'
 import {renderToStaticMarkup} from 'react-dom/server'
 import {corpus} from './corpus.mjs'
 const {Markdown} = await import(new URL(process.env.LIL2_ARTIFACT ?? '../.dev/dist/react-markdown.js', import.meta.url))
+const C = await import(new URL(process.env.LIL2_CONSTANTS ?? '../.dev/dist/constants.js', import.meta.url))
 
-// lil2's API passes nodes as ids into `tree` (the hast columns); upstream passes objects. Each option set
-// is written once per API with the same meaning.
-const T = {kind: 0, tagName: 4, start: 6, flags: 8, meta: 9, lineStarts: 16, kindNames: 17}
+// lil2's API passes nodes as ids into `tree` (the hast columns) and names tags and properties by int id;
+// upstream passes objects and strings. Each option set is written once per API with the same meaning.
+const T = {kind: 0, tag: 4, start: 6, flags: 8, meta: 9, lineStarts: 16, tagNames: 17}
+const H_ROOT = 0
 const lineOf = (tree, offset) => { const starts = tree[T.lineStarts]; let low = 0, high = starts.length - 1; while (low < high) { const mid = (low + high + 1) >> 1; if (starts[mid] <= offset) low = mid; else high = mid - 1 } return low + 1 }
 const upstreamComponents = {
   h2: function H2(props) { return jsx('h2', {id: 'line-' + props.node.position.start.line, children: props.children}) },
@@ -17,23 +19,23 @@ const upstreamComponents = {
   img: function Img(props) { return jsx('img', {src: props.src, alt: props.alt, 'data-tag': props.node.tagName}) },
   code: function Code(props) { return jsx('code', {className: props.className, 'data-meta': props.node.data?.meta, children: props.children}) }
 }
-const lil2Components = {
-  h2: function H2(props) { return jsx('h2', {id: 'line-' + lineOf(props.tree, props.tree[T.start][props.node]), children: props.children}) },
-  a: upstreamComponents.a,
-  img: function Img(props) { return jsx('img', {src: props.src, alt: props.alt, 'data-tag': props.tree[T.tagName][props.node]}) },
-  code: function Code(props) { const {tree, node} = props; return jsx('code', {className: props.className, 'data-meta': tree[T.flags][node] & 2 ? tree[T.meta][node] : undefined, children: props.children}) }
-}
+const lil2Components = [
+  C.TAG_H2, function H2(props) { return jsx('h2', {id: 'line-' + lineOf(props.tree, props.tree[T.start][props.node]), children: props.children}) },
+  C.TAG_A, upstreamComponents.a,
+  C.TAG_IMG, function Img(props) { const {tree, node} = props; return jsx('img', {src: props.src, alt: props.alt, 'data-tag': tree[T.tagNames][tree[T.tag][node]]}) },
+  C.TAG_CODE, function Code(props) { const {tree, node} = props; return jsx('code', {className: props.className, 'data-meta': tree[T.flags][node] & 2 ? tree[T.meta][node] : undefined, children: props.children}) }
+]
 const optionSets = [
   [{}, {}],
   [{skipHtml: true}, {skipHtml: true}],
-  [{allowedElements: ['p', 'strong', 'em', 'a']}, {allowedElements: ['p', 'strong', 'em', 'a']}],
-  [{allowedElements: ['p', 'strong', 'em', 'li', 'ul'], unwrapDisallowed: true}, {allowedElements: ['p', 'strong', 'em', 'li', 'ul'], unwrapDisallowed: true}],
-  [{disallowedElements: ['a', 'img', 'h1'], unwrapDisallowed: true}, {disallowedElements: ['a', 'img', 'h1'], unwrapDisallowed: true}],
-  [{disallowedElements: ['code', 'pre']}, {disallowedElements: ['code', 'pre']}],
-  [{allowElement: (node, index, parent) => !(node.tagName === 'em' && index === 0) && parent.type !== 'blockquote'},
-   {allowElement: (node, index, parent, tree) => !(tree[T.tagName][node] === 'em' && index === 0) && tree[T.kindNames][tree[T.kind][parent]] !== 'blockquote'}],
+  [{allowedElements: ['p', 'strong', 'em', 'a']}, {allowedElements: [C.TAG_P, C.TAG_STRONG, C.TAG_EM, C.TAG_A]}],
+  [{allowedElements: ['p', 'strong', 'em', 'li', 'ul'], unwrapDisallowed: true}, {allowedElements: [C.TAG_P, C.TAG_STRONG, C.TAG_EM, C.TAG_LI, C.TAG_UL], unwrapDisallowed: true}],
+  [{disallowedElements: ['a', 'img', 'h1'], unwrapDisallowed: true}, {disallowedElements: [C.TAG_A, C.TAG_IMG, C.TAG_H1], unwrapDisallowed: true}],
+  [{disallowedElements: ['code', 'pre']}, {disallowedElements: [C.TAG_CODE, C.TAG_PRE]}],
+  [{allowElement: (node, index, parent) => !(node.tagName === 'em' && index === 0) && parent.tagName !== 'blockquote'},
+   {allowElement: (node, index, parent, tree) => !(tree[T.tag][node] === C.TAG_EM && index === 0) && tree[T.tag][parent] !== C.TAG_BLOCKQUOTE}],
   [{urlTransform: (url, key, node) => key + ':' + node.tagName + ':' + url},
-   {urlTransform: (url, key, node, tree) => key + ':' + tree[T.tagName][node] + ':' + url}],
+   {urlTransform: (url, key, node, tree) => C.propNames[key] + ':' + tree[T.tagNames][tree[T.tag][node]] + ':' + url}],
   [{components: upstreamComponents}, {components: lil2Components}]
 ]
 

@@ -1,5 +1,7 @@
 // hast as an arena: a node is an int; fields live in parallel arrays.
 // Properties are an ordered list per element (insert or overwrite, like `Object.assign`).
+// Tag names, property names and enumerated values are ints; their names are only read where a name must
+// leave the program (the React element type and prop keys) and by tests.
 
 export const int H_ROOT = 0;
 export const int H_ELEMENT = 1;
@@ -8,7 +10,93 @@ export const int H_RAW = 3;
 export const int H_COMMENT = 4;
 export const int H_DOCTYPE = 5;
 
-export string[] hastKindNames = ["root", "element", "text", "raw", "comment", "doctype"];
+// Tags: every element the family's handlers create. Headings are contiguous (`TAG_H1 + depth - 1`).
+export const int TAG_NONE = 0;
+export const int TAG_A = 1;
+export const int TAG_BLOCKQUOTE = 2;
+export const int TAG_BR = 3;
+export const int TAG_CODE = 4;
+export const int TAG_DEL = 5;
+export const int TAG_DIV = 6;
+export const int TAG_EM = 7;
+export const int TAG_H1 = 8;
+export const int TAG_H2 = 9;
+export const int TAG_H3 = 10;
+export const int TAG_H4 = 11;
+export const int TAG_H5 = 12;
+export const int TAG_H6 = 13;
+export const int TAG_HR = 14;
+export const int TAG_IMG = 15;
+export const int TAG_INPUT = 16;
+export const int TAG_LI = 17;
+export const int TAG_OL = 18;
+export const int TAG_P = 19;
+export const int TAG_PRE = 20;
+export const int TAG_SECTION = 21;
+export const int TAG_STRONG = 22;
+export const int TAG_SUP = 23;
+export const int TAG_TABLE = 24;
+export const int TAG_TBODY = 25;
+export const int TAG_TD = 26;
+export const int TAG_TH = 27;
+export const int TAG_THEAD = 28;
+export const int TAG_TR = 29;
+export const int TAG_UL = 30;
+export const int TAG_SPAN = 31;
+export const int TAG_SVG = 32;
+export const int TAG_COUNT = 33;
+
+// Names by tag id. Elements an HTML parser produces beyond these (KaTeX's output) are interned after them.
+export string[] tagNames = ["", "a", "blockquote", "br", "code", "del", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "img", "input", "li", "ol", "p", "pre", "section", "strong", "sup", "table", "tbody", "td", "th", "thead", "tr", "ul", "span", "svg"];
+Map<string, int> tagIds = new Map<string, int>();
+
+// The id of a tag name, interning a new one.
+export int tagId(string name) {
+  if (tagIds.size == 0) {
+    for (int id = 1; id < tagNames.length; id++) {
+      tagIds.set(tagNames[id], id);
+    }
+  }
+  int? found = tagIds.get(name);
+  if (found != null) {
+    return found;
+  }
+  int id = tagNames.length;
+  tagNames.push(name);
+  tagIds.set(name, id);
+  return id;
+}
+
+// Properties (hast property names, as property-information spells them).
+export const int PROP_NONE = 0;
+export const int PROP_HREF = 1;
+export const int PROP_TITLE = 2;
+export const int PROP_SRC = 3;
+export const int PROP_ALT = 4;
+export const int PROP_ID = 5;
+export const int PROP_CLASS_NAME = 6;
+export const int PROP_START = 7;
+export const int PROP_TYPE = 8;
+export const int PROP_CHECKED = 9;
+export const int PROP_DISABLED = 10;
+export const int PROP_ALIGN = 11;
+export const int PROP_ARIA_DESCRIBED_BY = 12;
+export const int PROP_ARIA_LABEL = 13;
+export const int PROP_DATA_FOOTNOTES = 14;
+export const int PROP_DATA_FOOTNOTE_REF = 15;
+export const int PROP_DATA_FOOTNOTE_BACKREF = 16;
+export const int PROP_COUNT = 17;
+
+export string[] propNames = ["", "href", "title", "src", "alt", "id", "className", "start", "type", "checked", "disabled", "align", "ariaDescribedBy", "ariaLabel", "dataFootnotes", "dataFootnoteRef", "dataFootnoteBackref"];
+
+// Enumerated attribute values. The alignments equal mdast's `ALIGN_*`.
+export const int KW_NONE = 0;
+export const int KW_LEFT = 1;
+export const int KW_CENTER = 2;
+export const int KW_RIGHT = 3;
+export const int KW_CHECKBOX = 4;
+
+export string[] keywordNames = ["", "left", "center", "right", "checkbox"];
 
 // Property value kinds.
 export const int P_STRING = 0;
@@ -16,14 +104,18 @@ export const int P_NUMBER = 1;
 export const int P_BOOLEAN = 2;
 // A space-separated list (`className`): `pStr` holds the items joined by one space.
 export const int P_LIST = 3;
+// An enumerated value: `pNum` is a `KW_*` id.
+export const int P_KEYWORD = 4;
 
 export const int HN_HAS_POSITION = 1;
 export const int HN_META = 2;
+// An `li` with a task list checkbox (upstream finds these by their `task-list-item` class).
+export const int HN_TASK_LIST_ITEM = 4;
 
 export class Hast {
   int[] kind;
   int[] flags;
-  string[] tagName;
+  int[] tag;
   string[] value;
   string[] meta;
   int[] parent;
@@ -37,7 +129,7 @@ export class Hast {
   int[] lineStarts;
   int[] propHead;
   int[] propTail;
-  string[] pName;
+  int[] pProp;
   int[] pKind;
   string[] pStr;
   int[] pNum;
@@ -46,7 +138,7 @@ export class Hast {
   init() {
     this.kind = [];
     this.flags = [];
-    this.tagName = [];
+    this.tag = [];
     this.value = [];
     this.meta = [];
     this.parent = [];
@@ -59,18 +151,18 @@ export class Hast {
     this.lineStarts = [0];
     this.propHead = [];
     this.propTail = [];
-    this.pName = [];
+    this.pProp = [];
     this.pKind = [];
     this.pStr = [];
     this.pNum = [];
     this.pNext = [];
   }
 
-  int create(int kind, string tagName, string value) {
+  int create(int kind, int tag, string value) {
     int id = this.kind.length;
     this.kind.push(kind);
     this.flags.push(0);
-    this.tagName.push(tagName);
+    this.tag.push(tag);
     this.value.push(value);
     this.meta.push("");
     this.parent.push(-1);
@@ -85,12 +177,16 @@ export class Hast {
     return id;
   }
 
-  int element(string tagName) {
-    return this.create(H_ELEMENT, tagName, "");
+  int element(int tag) {
+    return this.create(H_ELEMENT, tag, "");
   }
 
   int text(string value) {
-    return this.create(H_TEXT, "", value);
+    return this.create(H_TEXT, TAG_NONE, value);
+  }
+
+  bool isElement(int node, int tag) {
+    return this.kind[node] == H_ELEMENT && this.tag[node] == tag;
   }
 
   bool has(int node, int flag) {
@@ -145,10 +241,10 @@ export class Hast {
     return list;
   }
 
-  int findProperty(int node, string name) {
+  int findProperty(int node, int name) {
     int prop = this.propHead[node];
     while (prop >= 0) {
-      if (this.pName[prop] == name) {
+      if (this.pProp[prop] == name) {
         return prop;
       }
       prop = this.pNext[prop];
@@ -157,11 +253,11 @@ export class Hast {
   }
 
   // Sets a property, keeping the position of an existing one (`properties[name] = value`).
-  int setProperty(int node, string name, int kind, string str, int num) {
+  int setProperty(int node, int name, int kind, string str, int num) {
     int prop = this.findProperty(node, name);
     if (prop < 0) {
-      prop = this.pName.length;
-      this.pName.push(name);
+      prop = this.pProp.length;
+      this.pProp.push(name);
       this.pKind.push(kind);
       this.pStr.push(str);
       this.pNum.push(num);
@@ -181,20 +277,24 @@ export class Hast {
     return prop;
   }
 
-  void setString(int node, string name, string value) {
+  void setString(int node, int name, string value) {
     this.setProperty(node, name, P_STRING, value, 0);
   }
 
-  void setNumber(int node, string name, int value) {
+  void setNumber(int node, int name, int value) {
     this.setProperty(node, name, P_NUMBER, "", value);
   }
 
-  void setBoolean(int node, string name, bool value) {
+  void setBoolean(int node, int name, bool value) {
     this.setProperty(node, name, P_BOOLEAN, "", if (value) { 1 } else { 0 });
   }
 
-  void setList(int node, string name, string joined) {
+  void setList(int node, int name, string joined) {
     this.setProperty(node, name, P_LIST, joined, 0);
+  }
+
+  void setKeyword(int node, int name, int keyword) {
+    this.setProperty(node, name, P_KEYWORD, "", keyword);
   }
 
   void copyPosition(int to, int sOffset, int eOffset) {
