@@ -111,6 +111,11 @@ export const int HN_HAS_POSITION = 1;
 export const int HN_META = 2;
 // An `li` with a task list checkbox (upstream finds these by their `task-list-item` class).
 export const int HN_TASK_LIST_ITEM = 4;
+// Math for rehype-katex, which upstream finds by class: a `code` whose class is `language-math` (a fenced
+// block with the info string `math`, or math from remark-math), `math-inline`, or `math-display`.
+export const int HN_LANGUAGE_MATH = 8;
+export const int HN_MATH_INLINE = 16;
+export const int HN_MATH_DISPLAY = 32;
 
 export class Hast {
   int[] kind;
