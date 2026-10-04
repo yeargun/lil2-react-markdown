@@ -46,7 +46,9 @@ The other props are react-markdown's, with ints for names and ids for nodes:
 `[kind, parent, firstChild, nextSibling, tag, value, startOffset, endOffset, flags, meta, propHead, propName,
 propKind, propString, propNumber, propNext, lineStarts, tagNames]`.
 
-`skipHtml` and `unwrapDisallowed` are unchanged. `constants` (`TAG_*`, `PROP_*`, `tagNames`, `propNames`) is its
+`skipHtml` and `unwrapDisallowed` are unchanged. remark-rehype's footnote options are props too: `clobberPrefix`,
+`footnoteLabel`, `footnoteLabelTag` (a tag id), and `footnoteBackLabel` and `footnoteBackContent` (a string, or a
+function of the reference and rereference index returning one). `constants` (`TAG_*`, `PROP_*`, `tagNames`, `propNames`) is its
 own entry, so importing a flavor costs nothing for them.
 
 ## Builds

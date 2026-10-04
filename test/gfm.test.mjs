@@ -19,6 +19,10 @@ const optionSets = [
    {plugins: [GFM], urlTransform: (url, key, node, tree) => C.propNames[key] + ':' + tree[T.tagNames][tree[T.tag][node]] + ':' + url}],
   [{remarkPlugins: [remarkGfm], components: {td: props => jsx('td', {...props, node: undefined, 'data-cell': 1})}},
    {plugins: [GFM], components: [C.TAG_TD, props => jsx('td', {...props, node: undefined, tree: undefined, 'data-cell': 1})]}],
+  [{remarkPlugins: [remarkGfm], remarkRehypeOptions: {clobberPrefix: 'x-', footnoteLabel: 'Notes', footnoteLabelTagName: 'h3', footnoteBackLabel: (i, r) => 'Back ' + i + '.' + r, footnoteBackContent: 'up'}},
+   {plugins: [GFM], clobberPrefix: 'x-', footnoteLabel: 'Notes', footnoteLabelTag: C.TAG_H3, footnoteBackLabel: (i, r) => 'Back ' + i + '.' + r, footnoteBackContent: 'up'}],
+  [{remarkPlugins: [remarkGfm], remarkRehypeOptions: {clobberPrefix: '', footnoteBackLabel: 'Back', footnoteBackContent: (i, r) => '↑' + i + r}},
+   {plugins: [GFM], clobberPrefix: '', footnoteBackLabel: 'Back', footnoteBackContent: (i, r) => '↑' + i + r}],
   [{}, {}]
 ]
 

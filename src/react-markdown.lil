@@ -7,6 +7,7 @@ import extern {Fragment, jsx, jsxs} from "react/jsx-runtime";
 extern JsValue Fragment;
 extern JsValue jsx;
 extern JsValue jsxs;
+extern JsValue String;
 
 import { parseTree } from "./mdast/parse.lil";
 import { Tree } from "./mdast/tree.lil";
@@ -199,6 +200,8 @@ void visitChildren(Post post, int parent) {
 // `tree`, the hast columns (see `hastColumns`): `urlTransform(url, prop, node, tree)`,
 // `allowElement(node, index, parent, tree)`, and `props.node` / `props.tree` for components.
 export JsValue Markdown(JsValue options) {
+  // As upstream's production build: `children` that is not a string renders nothing (its devlop check only throws
+  // under the `development` condition), and `allowedElements` wins over `disallowedElements`.
   JsValue children = options["children"];
   string value = if (JS.typeOf(children) == "string") { JS.assume(children) } else { "" };
   // remark-parse with the plugins' syntax and mdast handlers, their mdast transforms, remark-rehype (to-hast's
@@ -209,6 +212,20 @@ export JsValue Markdown(JsValue options) {
     transform(mdast);
   }
   ToHast state = toHastTree(mdast, true);
+  // remark-rehype's footnote options, as props: `clobberPrefix`, `footnoteLabel`, `footnoteLabelTag` (a tag id),
+  // `footnoteBackLabel` and `footnoteBackContent` (a string, or a function of the reference and rereference index).
+  JsValue clobberPrefix = options["clobberPrefix"];
+  if (JS.typeOf(clobberPrefix) == "string") {
+    state.clobberPrefix = JS.assume(clobberPrefix);
+  }
+  if (bool(options["footnoteLabel"])) {
+    state.footnoteLabel = JS.assume(String(options["footnoteLabel"]));
+  }
+  if (bool(options["footnoteLabelTag"])) {
+    state.footnoteLabelTag = JS.number(options["footnoteLabelTag"]).toInt();
+  }
+  state.footnoteBackLabel = options["footnoteBackLabel"];
+  state.footnoteBackContent = options["footnoteBackContent"];
   for (func(ToHast)->void install of plugins.hast) {
     install(state);
   }

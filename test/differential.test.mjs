@@ -60,3 +60,10 @@ for (const [i, [options, lil2Options]] of optionSets.entries()) {
     assert.equal(failures.length, 0)
   })
 }
+
+// Misuse renders as upstream's production build does (its devlop checks throw only in development).
+test('misuse renders like react-markdown', () => {
+  const render = (component, props) => { try { return renderToStaticMarkup(jsx(component, props)) } catch (error) { return 'THREW ' + error.message } }
+  for (const children of [42, ['a'], undefined, null, 0, true, {}]) assert.equal(render(Markdown, {children}), render(Upstream, {children}))
+  assert.equal(render(Markdown, {children: '*a* b', allowedElements: [C.TAG_P], disallowedElements: [C.TAG_P]}), render(Upstream, {children: '*a* b', allowedElements: ['p'], disallowedElements: ['p']}))
+})
